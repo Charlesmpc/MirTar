@@ -112,7 +112,7 @@ public static class BluetoothWorker {
         }
         old.Dispose();
     }
-    static async Task Connect(ulong address) {
+    static async Task Connect(ulong address, BluetoothAddressType addressType) {
         if (stopping || Interlocked.CompareExchange(ref connecting, 1, 0) != 0) return;
         var c = new Connection(Interlocked.Increment(ref nextConnection));
         lock (StateLock) {
@@ -122,7 +122,7 @@ public static class BluetoothWorker {
         bool complete = false;
         string stage = "open_device";
         try {
-            c.Device = await Await(BluetoothLEDevice.FromBluetoothAddressAsync(address)); CheckCurrent(c);
+            c.Device = await Await(BluetoothLEDevice.FromBluetoothAddressAsync(address,addressType)); CheckCurrent(c);
             if (c.Device == null) throw new Exception();
             if (!c.Device.DeviceInformation.Pairing.IsPaired) {
                 stage = "pair_device";
@@ -251,7 +251,7 @@ public static class BluetoothWorker {
                 bool matches = pairing ? name != null && name.StartsWith("MirTar-Add-") && name.Length == 17 : name == expectedName;
                 if (!matches || DateTime.UtcNow < retryAt) return;
                 retryAt = DateTime.UtcNow.AddSeconds(8);
-                await Connect(e.BluetoothAddress);
+                await Connect(e.BluetoothAddress,e.BluetoothAddressType);
             };
             watcher.Stopped += (s, e) => Status("scan_stopped");
             watcher.Start(); Status("scanning");

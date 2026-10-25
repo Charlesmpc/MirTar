@@ -58,9 +58,11 @@ source.write_bytes(git('archive', '--format=zip', f'--prefix=MirTar-{tag}/', com
 required = {'README.md', 'README.zh-CN.md', '.gitignore', 'package.json', 'package-lock.json', 'tsconfig.json',
             'DESIGN.md', 'TECH_DESIGN.md', 'tools/Start-Bridge.ps1', 'tools/Start-Bluetooth.ps1',
             'tools/Enable-Bluetooth.ps1', 'tools/Test-Bluetooth.ps1', 'tools/Test-BridgeRecovery.ps1', 'tools/Reset-BluetoothPairing.ps1', 'tools/New-LocalConfig.ps1', 'tools/Add-Server.ps1', 'tools/add-server.ts', 'tools/Convert-DeviceConfig.ps1', 'tools/Export-DeviceConfig.ps1', 'tools/check-private-files.mjs',
-            'tools/check-private-files.test.mjs', 'tools/audit-repository.mjs', 'tools/audit-repository.test.mjs', 'tools/device-simulator.ts', 'tools/portal.test.mjs', 'tools/test-firmware.py',
+            'tools/check-private-files.test.mjs', 'tools/audit-repository.mjs', 'tools/audit-repository.test.mjs', 'tools/device-simulator.ts', 'tools/portal.test.mjs', 'tools/test-firmware.py', 'tools/test-bonds.py',
             'firmware/main/portal.html', 'firmware/main/runtime_config.c', 'firmware/main/runtime_config.h',
             'firmware/main/state.c', 'firmware/main/state.h', 'firmware/tests/config_test.c', 'firmware/tests/stubs/esp_err.h', 'firmware/tests/stubs/nvs.h',
+            'firmware/main/bond_store.c','firmware/main/bond_store.h','firmware/tests/bond_store_test.c',
+            'firmware/tests/bond_stubs/esp_err.h','firmware/tests/bond_stubs/esp_random.h','firmware/tests/bond_stubs/nvs.h',
             'tools/validation/Stop-TestBrowser.ps1', 'firmware/UPSTREAM.md', 'firmware/UPSTREAM.zh_CN.md',
             'firmware/components/bsp/LICENSE', 'firmware/assets/OFL.txt'}
 runtime_files = {path: data for path, data in files.items() if path in required or path.startswith(('bridge/', 'config/', 'docs/'))}

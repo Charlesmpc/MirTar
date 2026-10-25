@@ -53,6 +53,9 @@ def require_public(directory, expected_version=None):
         raise ValueError('Only the unpersonalized public release may be published')
     if set(manifest['segments'])!={'0x0','0x8000','0x10000'} or image[start:start+size]!=b'\xff'*size:
         raise ValueError('Public firmware must have an empty NVS region')
+    if tuple(map(int,version.split('.'))) >= (0,5,1) and (manifest.get('bluetoothStorageSchema')!=1 or
+        manifest.get('bluetoothResetScope')!='server' or manifest.get('bluetoothPerServerIdentity') is not True):
+        raise ValueError('This version requires server-scoped Bluetooth storage; older reset-all builds are superseded')
     return manifest
 
 def export_public(source, destination):

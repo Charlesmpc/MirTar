@@ -29,20 +29,22 @@ With four hosts saved, update an existing entry through a file instead.
 
 ## Bluetooth recovery after one minute
 
-When an existing host cannot complete Bluetooth binding for one minute, the connecting/retrying screen offers
-**Reset Bluetooth pairing**. Repeated disconnects do not restart the timer. Successful binding removes the offer.
+After one minute without completing Bluetooth binding to an existing host, the connection/retry screen offers
+**Reset Bluetooth pairing**. Repeated disconnects do not restart the timer. Press OK, select Reset with UP/DOWN,
+then OK again; Cancel is selected first.
 
-1. Press OK, select **Clear and pair again** with UP/DOWN, then OK. Cancel is selected initially.
-2. This clears **all badge Bluetooth bonds**, while retaining servers, application binding keys and per-host Wi-Fi.
-   Older versions did not map server IDs to Bluetooth identities, so selective per-computer clearing is not reliable.
-   Other computers must pair again too.
-3. Stop the computer's bridge and run `./tools/Start-Bridge.ps1 -ResetBluetoothPairing`.
-   This explicit option removes only the Windows pairing whose name exactly matches this bridge's configured Bluetooth name.
-   If Windows still uses an old `MirTar-Add-...` name, remove that badge entry manually in Windows Bluetooth settings.
-4. Press OK on the badge to reconnect, then enter its new six-digit PIN in the Windows dialog. Continue in the existing session.
+Reset affects only the current `server.id`'s binary Bluetooth profile and badge identity. Other hosts' bonds,
+server configuration, application keys and Wi-Fi remain unchanged. Press OK to reconnect and enter the new PIN
+in Windows while the bridge remains running. The new identity establishes a fresh pairing for this host.
 
-Hold OK to exit. Timing out alone never removes a bond, erases NVS or replays audio. Failed reset is reported rather than
-displaying success. Wi-Fi, new-server enrollment and config upload do not offer this recovery action.
+Profiles are generated automatically, without hand-edited Bluetooth addresses or keys in config-file. Enrollment
+is assigned to `server.id` on physical confirmation. Display-name and Wi-Fi changes preserve its profile.
+Legacy shared bonds remain untouched and unassigned; each host pairs once under the new storage design.
+See [Bluetooth storage](bluetooth-storage.md).
+
+Hold OK to exit. Timeout alone never removes a bond or replays audio. Failed resets are reported.
+Wi-Fi, enrollment and config upload do not offer this action. The explicit Windows maintenance option
+`Start-Bridge.ps1 -ResetBluetoothPairing` remains available for old records but is not required by the new flow.
 
 ## Add config-file: local hotspot upload
 

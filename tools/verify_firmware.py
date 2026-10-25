@@ -27,6 +27,13 @@ manifest = {'sdk':'5.5.6','chip':'esp32c3','flashOffset':'0x0','sha256':hashlib.
 project = json.loads((root/'project_description.json').read_text(encoding='utf-8'))
 manifest['version'] = project.get('project_version', 'unknown')
 manifest['applicationVersion'] = manifest['version']
+if tuple(map(int,manifest['version'].split('.')[:3])) >= (0,5,1):
+    from elftools.elf.elffile import ELFFile
+    with (root/'MirTar.elf').open('rb') as elf:
+        symbols=ELFFile(elf).get_section_by_name('.symtab')
+        names={s.name for s in symbols.iter_symbols()} if symbols else set()
+    assert {'mt_bond_prepare','mt_bond_reset','__wrap_nvs_open'}.issubset(names), 'This release requires actual server-scoped Bluetooth storage code'
+    manifest.update(bluetoothStorageSchema=1,bluetoothResetScope='server',bluetoothPerServerIdentity=True)
 numbers = re.match(r'(\d+)\.(\d+)', project.get('project_version', ''))
 assert numbers and tuple(map(int, numbers.groups())) >= (0, 4), 'Use the matching pre-provisioning verifier for old images'
 manifest['templateConfiguration'] = False

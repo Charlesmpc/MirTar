@@ -1,4 +1,5 @@
 #include "ble_transport.h"
+#include "bond_store.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdatomic.h>
@@ -10,6 +11,7 @@
 #include "nimble/nimble_port.h"
 #include "nimble/nimble_port_freertos.h"
 #include "host/ble_hs.h"
+#include "host/ble_hs_id.h"
 #include "host/ble_sm.h"
 #include "host/ble_store.h"
 #include "host/util/util.h"
@@ -24,6 +26,7 @@ static atomic_uint connection = BLE_HS_CONN_HANDLE_NONE;
 static atomic_bool enabled, synced, ready;
 static bool initialized, subscribed, faulted;
 static uint8_t own_address, tx_sequence, rx_sequence;
+static uint8_t local_identity[6];
 static int expected_sequence = -1;
 static char name[29], rx_buffer[8193];
 static size_t rx_used, rx_size;
@@ -125,20 +128,22 @@ static int gap_event(struct ble_gap_event *event, void *arg) {
     return 0;
 }
 static void host_sync(void) {
-    if (ble_hs_util_ensure_addr(0) || ble_hs_id_infer_auto(0, &own_address)) return;
+    if (ble_hs_id_set_rnd(local_identity) || ble_hs_id_infer_auto(0, &own_address)) return;
     atomic_store(&synced, true); advertise();
 }
 static void host_task(void *arg) { (void)arg; nimble_port_run(); nimble_port_freertos_deinit(); }
-bool mt_ble_start(const char *host_name, uint32_t generation, mt_ble_callback_t callback) {
+bool mt_ble_start(const char *server_id, const char *host_name, uint32_t generation, mt_ble_callback_t callback) {
     if (faulted) return false;
     mt_ble_stop();
+    if (initialized) return false;
     if (!host_name || !host_name[0] || strlen(host_name) > 20) return false;
+    if (mt_bond_prepare(server_id,local_identity)!=ESP_OK) return false;
     current_generation = generation; notify = callback;
     snprintf(name, sizeof(name), "MirTar-%s", host_name);
     atomic_store(&enabled, true);
     if (!initialized) {
         send_lock = xSemaphoreCreateMutex(); if (!send_lock || nimble_port_init() != ESP_OK) { enabled = false; return false; }
-        ble_svc_gap_init(); ble_svc_gatt_init();
+        ble_svc_gap_init(); ble_svc_gatt_init();ble_svc_gap_device_name_set(name);
         ble_hs_cfg.sync_cb = host_sync;
         ble_hs_cfg.sm_io_cap = BLE_HS_IO_DISPLAY_ONLY;
         ble_hs_cfg.sm_bonding = 1; ble_hs_cfg.sm_mitm = 1; ble_hs_cfg.sm_sc = 1;
@@ -165,15 +170,25 @@ void mt_ble_stop(void) {
         if (send_lock) { vSemaphoreDelete(send_lock); send_lock = NULL; }
     }
 }
-bool mt_ble_reset_bonds(void) {
-    if (!initialized || faulted) return false;
+bool mt_ble_assign_server(const char *server_id) {
+    if(!initialized||faulted||!atomic_load(&ready)||!secure())return false;
+    struct ble_gap_conn_desc desc;
+    if(ble_gap_conn_find(atomic_load(&connection),&desc))return false;
+    struct ble_store_key_sec key={.peer_addr=desc.peer_id_addr};struct ble_store_value_sec value;
+    if(ble_store_read_our_sec(&key,&value)||!value.ltk_present)return false;
+    int peers=0;
+    if(ble_store_util_count(BLE_STORE_OBJ_TYPE_OUR_SEC,&peers)||peers!=1)return false;
+    return mt_bond_promote(server_id)==ESP_OK;
+}
+bool mt_ble_reset_bonds(const char *server_id) {
+    if (!initialized || faulted || !mt_bond_matches(server_id)) return false;
     atomic_store(&enabled, false); atomic_store(&ready, false);
     ble_gap_adv_stop();
-    // Stop connections and the host before clearing its store, while store callbacks
-    // still exist. Deinit frees them, so it must happen after the clear, not before.
+    // No global ble_store_clear(): the selected server alone owns the profile.
+    // Stop the host before switching generations or rotating its local identity.
     int stop_rc = nimble_port_stop();
     if (stop_rc) { faulted = true; printf("MirTar BLE reset stop_error=%d\n", stop_rc); return false; }
-    int clear_rc = ble_store_clear();
+    int clear_rc = mt_bond_reset(server_id);
     int deinit_rc = nimble_port_deinit();
     initialized = false; atomic_store(&synced, false);
     atomic_store(&connection, BLE_HS_CONN_HANDLE_NONE); subscribed = false;

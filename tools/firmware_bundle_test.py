@@ -44,6 +44,14 @@ class Bundles(unittest.TestCase):
         with self.assertRaises(ValueError):require_public(self.public,'0.6.0')
         (self.public/'MirTar.bin').write_bytes(b'wrong')
         with self.assertRaises(ValueError):require_public(self.public)
+    def test_old_reset_all_preview_cannot_be_packaged_as_current_051(self):
+        app=bytearray((self.public/'MirTar.bin').read_bytes());app[48:80]=b'0.5.1'.ljust(32,b'\0')
+        (self.public/'MirTar.bin').write_bytes(app);self.image[0x10000:]=app
+        self.manifest['segments']['0x10000']['sha256']=digest(app)
+        self.manifest.update(version='0.5.1',applicationVersion='0.5.1');self.save()
+        with self.assertRaisesRegex(ValueError,'server-scoped'):require_public(self.public)
+        self.manifest.update(bluetoothStorageSchema=1,bluetoothResetScope='server',bluetoothPerServerIdentity=True);self.save()
+        require_public(self.public,'0.5.1')
     def test_sdk_preset_round_trip_crosses_pages_and_stays_private(self):
         idf=ROOT/'.private/toolchains/esp-idf-v5.5.6'
         python=ROOT/'.private/toolchains/idf-tools/python_env/idf5.5_py3.12_env/Scripts/python.exe'

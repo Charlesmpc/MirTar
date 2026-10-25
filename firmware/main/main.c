@@ -29,7 +29,7 @@
 
 typedef enum { EV_KEY, EV_WIFI_ON, EV_WIFI_OFF, EV_WS_ON, EV_WS_OFF, EV_JSON, EV_AUDIO_DONE, EV_BLE_PIN, EV_CONFIG } event_kind_t;
 typedef struct { event_kind_t kind; int key, action; uint32_t generation; char *json; } event_t;
-typedef struct { const char *name, *url, *secret, *bluetooth_name; } target_t;
+typedef struct { const char *id, *name, *url, *secret, *bluetooth_name; } target_t;
 static QueueHandle_t events;
 static TaskHandle_t audio_task_handle;
 static SemaphoreHandle_t audio_stopped;
@@ -215,7 +215,7 @@ static void read_settings(void) {
     memset(targets,0,sizeof(targets));cJSON *item;
     cJSON_ArrayForEach(item,cJSON_GetObjectItem(device_config,"servers")) {
         if(target_count>=4)break;
-        targets[target_count++]=(target_t){.name=str(item,"name"),.secret=str(item,"secret"),
+        targets[target_count++]=(target_t){.id=str(item,"id"),.name=str(item,"name"),.secret=str(item,"secret"),
             .bluetooth_name=str(item,"bluetoothName"),.url=str(cJSON_GetObjectItem(item,"wifi"),"url")};
     }
     if(bsp_lvgl_lock(200)){mt_ui_skin(!strcmp(str(device_config,"skin"),"reading"));mt_ui_flavor(str(device_config,"buildFlavor"));bsp_lvgl_unlock();}
@@ -235,7 +235,7 @@ static void enter_pairing(void) {
     manual_machine_selection=false;state.transport=MT_BLUETOOTH;state.page=MT_PAIRING;
     pair_deadline=esp_timer_get_time()+120000000;
     char name[21];snprintf(name,sizeof(name),"Add-%06lX",(unsigned long)(esp_random()&0xffffff));
-    if(!mt_ble_start(name,generation,ble_event)){status("蓝牙启动失败");render("长按 OK 返回");return;}
+    if(!mt_ble_start(NULL,name,generation,ble_event)){status("蓝牙启动失败");render("长按 OK 返回");return;}
     status("等待电脑添加  仅蓝牙");
     render("在电脑运行\nAdd-Server.ps1\n\n在 Windows 输入卡片配对码\n\n长按 OK 取消");
 }
@@ -249,7 +249,7 @@ static void connect_target(void) {
     if (state.transport == MT_BLUETOOTH) {
         const char *name = targets[target_index].bluetooth_name;
         if (!name[0]) name = targets[target_index].name;
-        if (!mt_ble_start(name, generation, ble_event)) { status("蓝牙启动失败"); render("长按 OK 返回\n\n可以选择 Wi-Fi 连接"); return; }
+        if (!mt_ble_start(targets[target_index].id,name, generation, ble_event)) { status("蓝牙启动失败"); render("长按 OK 返回\n\n可以选择 Wi-Fi 连接"); return; }
         mt_ble_wait_start(&state, esp_timer_get_time());
         status("等待蓝牙连接"); render("请启动电脑上的桥接\n\n首次连接请在 Windows\n输入卡片上的配对码\n\n已配对的电脑会自动连接");
     } else {
@@ -270,7 +270,7 @@ static void show_ble_recovery(void) {
 }
 static void show_ble_reset_confirm(void) {
     char body[340];
-    snprintf(body,sizeof(body),"清除卡片全部蓝牙配对？\n其他电脑也需重新配对\n主机和 Wi-Fi 配置保留\n\n%s 取消，继续等待\n\n%s 清除并重新配对",
+    snprintf(body,sizeof(body),"重置这台主机的蓝牙配对？\n其他主机配对不受影响\n主机和 Wi-Fi 配置保留\n\n%s 取消，继续等待\n\n%s 重置并重新配对",
         reset_confirm_yes?" ":">",reset_confirm_yes?">":" ");
     state.page=MT_BLE_RESET_CONFIRM;status("上下选择  OK 确认");render(body);
 }
@@ -278,10 +278,10 @@ static void reset_ble_pairing(void) {
     stop_audio();if(atomic_load(&audio_busy))return;
     generation++;mt_ble_wait_clear(&state);
     status("正在清除蓝牙配对");render(NULL);
-    reset_done=mt_ble_reset_bonds();mt_disconnect(&state);state.page=MT_BLE_RESET_GUIDE;
+    reset_done=mt_ble_reset_bonds(targets[target_index].id);mt_disconnect(&state);state.page=MT_BLE_RESET_GUIDE;
     if(!reset_done){status("重置失败，请重启后重试");render("主机和 Wi-Fi 配置保留\n\n长按 OK 返回\n仍失败请重启卡片");return;}
     status("OK 重新连接  长按 OK 返回");
-    render("卡片蓝牙配对已清除\n主机和 Wi-Fi 已保留\n\n电脑删除旧 MirTar 配对\n或启动桥接时加参数\n-ResetBluetoothPairing\n\n按 OK 重新连接");
+    render("这台主机蓝牙配对已重置\n其他主机和 Wi-Fi 已保留\n\n按 OK 重新连接\n在 Windows 输入新验证码\n\n电脑桥接需保持运行");
 }
 static void wifi_event(void *arg, esp_event_base_t base, int32_t id, void *data) {
     (void)data; uint32_t current = (uint32_t)(uintptr_t)arg;
@@ -432,6 +432,7 @@ static void handle_key(int key, int action) {
     if(state.page==MT_PAIRING)return;
     if(state.page==MT_PAIR_CONFIRM) {
         if(action!=BSP_BTN_CLICK||key!=BSP_BTN_OK||!pair_candidate)return;
+        if(!mt_ble_assign_server(pair_server_id)){status("蓝牙记录保存失败");render("长按 OK 返回\n重新选择 Add server");return;}
         if(mt_config_save(pair_candidate)!=ESP_OK){status("保存失败，OK 重试");render(NULL);return;}
         cJSON_Delete(device_config);device_config=pair_candidate;pair_candidate=NULL;read_settings();
         cJSON *ack=message("pair_saved");cJSON_AddStringToObject(ack,"nonce",pair_nonce);cJSON_AddStringToObject(ack,"serverId",pair_server_id);send_json(ack);

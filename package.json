@@ -17,7 +17,8 @@
     "test": "node --test bridge/tests/*.test.ts",
     "device": "node tools/device-simulator.ts",
     "test:portal": "node --test tools/portal.test.mjs",
-    "test:firmware": "python tools/test-firmware.py"
+    "test:firmware": "python tools/test-firmware.py",
+    "test:bonds": "python tools/test-bonds.py"
   },
   "dependencies": {
     "ws": "8.18.3"

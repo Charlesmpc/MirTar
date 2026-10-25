@@ -8,13 +8,15 @@ after one minute without completing binding to an existing host. Reset is never 
 - Initial waiting and repeated disconnects share a timer. Authenticated application binding clears it.
 - An actual pairing PIN grants a fresh minute so the reset prompt does not immediately replace the code.
 - OK opens confirmation; Cancel is selected first. UP/DOWN select; OK confirms. Hold OK returns home.
-- Card reset stops the NimBLE host, clears only the Bluetooth store, then deinitializes before allowing reconnect.
-  The SDK store uses `nimble_bond`; MirTar host/Wi-Fi/binding config remains in the separate `mirtar` namespace.
-- All card bonds are reset: v0.5.0 had no persisted server-ID/Bluetooth-identity mapping for reliable selective deletion.
+- Card reset stops the NimBLE host and resets only the active server ID's binary profile before deinitializing.
+  Metadata plus A/B store banks belong to each server ID; MirTar config stays in its separate `mirtar` namespace.
+- Each server has an automatically generated static identity, allowing a fresh Windows pairing after a scoped reset.
+  Enrollment staging is copied/published on physical server confirmation; no address or key is hand-entered.
+- Legacy global bonds are retained unused rather than guessed, assigned or globally deleted.
 - Failure is reported. A failed stop/deinit requires restart; the UI does not pretend reset succeeded.
 - Windows pairing is reset only by the explicit local `-ResetBluetoothPairing` option. It selects one paired record by
   exact configured Bluetooth name and rejects ambiguity. No radio advertisement or failed GATT request can authorize unpairing.
-- Old enrollment names may require manual removal in Windows Bluetooth settings. Neither recovery path edits Agent sessions,
+- Explicit Windows cleanup is optional maintenance for old records, not required for new scoped resets. Neither path edits Agent sessions,
   regenerates application keys, submits a task or automatically replays audio.
 - Native subscribe readiness buffering, bounded retries, cache refresh and connection-generation isolation are retained.
   Subscribe durations and ATT codes are logged; card logs add connect, disconnect and encryption status without keys/PINs.
@@ -39,6 +41,13 @@ PowerShell recovery scenarios (ordinary startup, active-worker guard, explicit r
 mock Bluetooth/node commands and do not remove real pairings. Source index/history privacy audit found zero credential
 or personal findings. Flash validation was `-WhatIf` only.
 
-Physical checks remain pending: screen readability and physical confirmation/cancel, persistent bond deletion and retained
-configuration, fresh Windows PIN after clearing both ends, restored session/voice/reply path, other-host re-pairing and
-failure during a persistent-store write. No card is flashed, reset or unpaired during development checks.
+The actual bond-store host tests additionally cover per-server key/identity isolation, stable IDs across reconnect,
+scoped reset with another host unchanged, untouched legacy/config namespaces, staging promotion retaining its identity,
+copy/commit failures preserving the previous selected generation, collision/SDK ownership checks and retained CCCD/IRK
+records for another host. Manifest generation also verifies actual ELF storage symbols; release guards reject the earlier
+reset-all v0.5.1 preview. The per-server implementation supersedes that unreleased local preview.
+
+Physical checks remain pending: screen readability and confirmation/cancel, persistent per-server deletion, retained
+other-host bonds/config, fresh Windows PIN with a static random identity, enrollment-to-normal identity reuse,
+session/voice/reply path, NVS space with four hosts and failure during flash writes. No card is flashed, reset or unpaired
+during development checks. See [storage layout](../bluetooth-storage.md).

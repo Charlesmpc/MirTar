@@ -39,10 +39,10 @@ MirTar 把 FoloToy AI Passport 卡片变成**电脑上编程 Agent 的随身控�
 3. 选择已保存主机，默认 Bluetooth；Wi-Fi 仅使用该主机自己的网络和电脑地址。
 4. OK 开始录音，再次 OK 提交；上下翻阅，长按上下切会话，长按 OK 回首页。
 
-**v0.5.1 蓝牙恢复：** 连续一分钟无法绑定时，连接页提供“重置蓝牙配对”，需按键确认。
-清除卡片全部蓝牙配对，保留主机和 Wi-Fi；电脑停止桥接后用
-`.\tools\Start-Bridge.ps1 -ResetBluetoothPairing` 清理对应旧配对并重新输入验证码。
-完整步骤见[蓝牙重置说明](docs/server-onboarding.zh_CN.md#蓝牙断线超过一分钟重置配对)。
+**v0.5.1 蓝牙恢复：** 一分钟无法绑定时，连接页提供按键确认的配对重置。
+蓝牙档案自动按 `server.id` 独立保存；只重置当前主机，保留其他主机、Wi-Fi 与应用绑定。
+重置后按 OK 连接并输入新的 Windows 配对码，无需手工编辑蓝牙数据。
+见[蓝牙恢复说明](docs/server-onboarding.zh_CN.md#蓝牙断线超过一分钟重置当前主机配对)。
 
 ## 开始使用
 

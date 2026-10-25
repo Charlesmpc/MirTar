@@ -57,9 +57,9 @@ voice limits still apply.
 3. Select a saved host, then Bluetooth (default) or that host's configured Wi-Fi.
 4. OK records; OK again submits. UP/DOWN scroll; hold them to change sessions. Hold OK to return home.
 
-**v0.5.1 Bluetooth recovery:** After one minute without completing binding, the connection screen offers a confirmed
-pairing reset. It clears all badge Bluetooth bonds while retaining hosts and Wi-Fi. Stop the bridge and run
-`.\tools\Start-Bridge.ps1 -ResetBluetoothPairing` to remove its matching Windows bond and enter a fresh PIN.
+**v0.5.1 Bluetooth recovery:** After one minute without binding, the card offers a physically confirmed reset.
+Opaque Bluetooth profiles are generated and stored per `server.id`. Reset affects only the selected host;
+other hosts, Wi-Fi and application binding remain intact. Reconnect and enter the new Windows PIN.
 See [Bluetooth recovery](docs/server-onboarding.md#bluetooth-recovery-after-one-minute).
 
 ## Get started
