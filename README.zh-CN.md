@@ -22,7 +22,7 @@ MirTar 把 FoloToy AI Passport 卡片变成**电脑上编程 Agent 的随身控�
 这不等于离线运行 Agent。BLE 使用认证加密和应用绑定；Wi-Fi 当前仍为明文，只适合可信局域网。
 
 **OS 适配层独立于 Agent 和设备协议**：目前实现 Windows 桥接，后续计划实现 macOS、Linux。
-当前 Agent 适配器是 Codex。**当前分支为 v0.5.0 开发版**，从 v0.3.1 重新开发。
+当前 Agent 适配器是 Codex。**当前分支为 v0.5.1 开发版**，从 v0.3.1 重新开发。
 开机三个入口：Server list、Add server、Add config-file。蓝牙添加交换主机名称和绑定信息；
 文件导入只在主动开启卡片热点后进行。每台主机保存自己的可选 Wi-Fi，默认连接方式仍是蓝牙。
 新流程尚待真机验收，旧版用户语音测试通过不代表本版验收。
@@ -38,6 +38,11 @@ MirTar 把 FoloToy AI Passport 卡片变成**电脑上编程 Agent 的随身控�
 2. Add config-file 开启卡片热点，扫码或手动连接后访问 `http://192.168.4.1`，上传准备好的 v2 设备 JSON。
 3. 选择已保存主机，默认 Bluetooth；Wi-Fi 仅使用该主机自己的网络和电脑地址。
 4. OK 开始录音，再次 OK 提交；上下翻阅，长按上下切会话，长按 OK 回首页。
+
+**v0.5.1 蓝牙恢复：** 连续一分钟无法绑定时，连接页提供“重置蓝牙配对”，需按键确认。
+清除卡片全部蓝牙配对，保留主机和 Wi-Fi；电脑停止桥接后用
+`.\tools\Start-Bridge.ps1 -ResetBluetoothPairing` 清理对应旧配对并重新输入验证码。
+完整步骤见[蓝牙重置说明](docs/server-onboarding.zh_CN.md#蓝牙断线超过一分钟重置配对)。
 
 ## 开始使用
 
@@ -62,11 +67,11 @@ npm.cmd ci --ignore-scripts
 
 - [主机添加、文件格式与完整步骤](docs/server-onboarding.zh_CN.md)
 - [固件编译与刷入](docs/device-quickstart.zh_CN.md)
-- [验证记录](docs/validation/server-onboarding-0.5.0.md)
+- [验证记录](docs/validation/server-onboarding-0.5.1.md)
 
 本开发版尚未发布或投稿；可本地构建不含私人凭据的通用镜像，保留原已验证镜像作回退。
 
-`0.5.0` 是准备发布的公开版本：不修改配置也能编译，全新设备主机列表为空。
+`0.5.1` 是准备发布的公开版本：不修改配置也能编译，全新设备主机列表为空。
 个人配置可用 `Build-PersonalFirmware.ps1` 打包进本地 NVS 镜像，并用自己的标签区分；
 个人镜像禁止上传 Release 或社区。只维护公开源码，旧私有历史归档不再用于开发。
 见[公开版与个人镜像的构建说明](docs/build-variants.zh_CN.md)。

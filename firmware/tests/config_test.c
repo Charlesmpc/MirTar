@@ -70,6 +70,25 @@ int main(int argc,char **argv){
     cJSON *duplicate=mt_config_parse(duplicated,strlen(duplicated)+1);assert(duplicate&&!mt_config_valid(duplicate));cJSON_Delete(duplicate);
     mt_state_t state={.page=MT_HOME,.connected=true,.bound=true,.session_count=1};assert(!mt_can_record(&state));
     state.page=MT_PAIR_CONFIRM;assert(!mt_can_record(&state));state.page=MT_READING;assert(mt_can_record(&state));state.submitting=true;assert(!mt_can_record(&state));mt_disconnect(&state);assert(!mt_can_record(&state));
+    /* Fast disconnect/retry loops must not postpone the one-minute recovery entry. */
+    state=(mt_state_t){.page=MT_CONNECTING,.transport=MT_BLUETOOTH};
+    mt_ble_wait_start(&state,1000);assert(!mt_ble_wait_update(&state,60000999));assert(!mt_ble_can_offer_reset(&state));
+    for(int retry=1;retry<10;retry++){
+        mt_disconnect(&state);state.page=MT_CONNECTING;mt_ble_wait_start(&state,1000+retry*5000000);
+        assert(state.ble_wait_since==1000);assert(!mt_ble_wait_update(&state,1000+retry*5000000));
+    }
+    assert(mt_ble_wait_update(&state,60001000));assert(mt_ble_can_offer_reset(&state));
+    assert(!mt_ble_wait_update(&state,90000000));assert(mt_ble_can_offer_reset(&state));
+    state.page=MT_BLE_RESET_CONFIRM;assert(!mt_can_record(&state));assert(!mt_ble_can_offer_reset(&state));
+    state.page=MT_CONNECTING;assert(mt_ble_can_offer_reset(&state)); /* Cancel keeps waiting; no store mutation. */
+    state.bound=true;assert(!mt_ble_can_offer_reset(&state));mt_ble_wait_clear(&state);
+    assert(!mt_ble_wait_update(&state,180000000));assert(!state.ble_waiting&&!state.ble_reset_offered);
+    state=(mt_state_t){.page=MT_CONNECTING,.transport=MT_WIFI};mt_ble_wait_start(&state,0);
+    assert(!state.ble_waiting&&!mt_ble_wait_update(&state,60000000));
+    state.transport=MT_BLUETOOTH;mt_ble_wait_start(&state,0);assert(mt_ble_wait_update(&state,60000000));
+    state.page=MT_READING;assert(!mt_ble_can_offer_reset(&state));state.page=MT_SETUP;assert(!mt_ble_can_offer_reset(&state));
+    state.page=MT_PAIRING;assert(!mt_ble_can_offer_reset(&state));state.page=MT_CONNECTING;state.recording=true;assert(!mt_ble_can_offer_reset(&state));
+    mt_ble_wait_clear(&state);assert(!state.ble_waiting);restored=mt_config_load();assert(restored&&mt_config_valid(restored));cJSON_Delete(restored);
     memcpy(stored,"not-json",9);stored_size=9;assert(!mt_config_load());
     cJSON_Delete(base);cJSON_Delete(first);cJSON_Delete(second);cJSON_Delete(both);cJSON_Delete(update);cJSON_Delete(changed);cJSON_Delete(bluetooth);cJSON_Delete(three);cJSON_Delete(fourth);cJSON_Delete(four);cJSON_Delete(fifth);
     const char *receipt="Configuration round-trip, per-host Wi-Fi, ID merge, import limits, commit failure and menu record guards: PASS";

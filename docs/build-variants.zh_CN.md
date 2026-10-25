@@ -4,18 +4,18 @@
 公开仓库包含通用程序、主机配置模板和个人镜像打包工具，不包含作者实际配置、密码、主机名称或地址。
 真实配置、镜像、导出和备份只保存在忽略的 `.private/`，提交钩子和历史扫描继续检查。
 
-## 公开 0.5.0
+## 公开 0.5.1
 
 ```powershell
 .\tools\Build-Firmware.ps1
-python tools/check-public-firmware.py .private/build-v0.5.0
+python tools/check-public-firmware.py .private/build-v0.5.1
 ```
 
 不读取 `.private/device.config.json`，也不自动使用 `config/device.example.json` 中的示例主机。
 不改任何配置也可以编译；**全新 NVS** 启动时主机列表为空，选择 Add server 进行蓝牙添加，
 或选择 Add config-file 导入自己的文件。有保存主机后才显示 Server list。
 升级若保留 NVS，则保留用户已有主机，不能据此判断公开镜像夹带了配置。
-公开镜像版本和程序版本都是 `0.5.0`，清单为 `distribution: public`、`publishable: true`、默认 NVS 全空。
+公开镜像版本和程序版本都是 `0.5.1`，清单为 `distribution: public`、`publishable: true`、默认 NVS 全空。
 
 公开模板仍为 `config/device.example.json`（v2）与 `config/bridge.example.json`。
 模板只有占位值；运行时导入前需生成真实私有文件，不能直接上传占位模板。
@@ -29,10 +29,10 @@ python tools/check-public-firmware.py .private/build-v0.5.0
 .\tools\Build-PersonalFirmware.ps1 -Config .private/device.v2.config.json -Name my-device
 ```
 
-默认输出 `.private/build-v0.5.0-my-device/MirTar-full.bin`，镜像版本与卡片显示为 `0.5.0-my-device`。
+默认输出 `.private/build-v0.5.1-my-device/MirTar-full.bin`，镜像版本与卡片显示为 `0.5.1-my-device`。
 `-Name` 是本地标签，可自行选择；默认值为 `personal`。
-两种镜像使用相同的 `0.5.0` 应用程序；个人包另外在 NVS 区域加入实际设备配置和本地标签。
-因此 ESP 应用描述符仍为 `0.5.0`，包清单的 `applicationVersion` 与个人镜像 `version` 分别记录两者。
+两种镜像使用相同的 `0.5.1` 应用程序；个人包另外在 NVS 区域加入实际设备配置和本地标签。
+因此 ESP 应用描述符仍为 `0.5.1`，包清单的 `applicationVersion` 与个人镜像 `version` 分别记录两者。
 个人清单为 `distribution: personal`、`publishable: false`、`configurationEmbedded: true`，禁止上传。
 工具使用 SDK 生成 NVS，再解码核对配置 blob、长度与 CRC；不重新编译密钥进 C/C++ 源码。
 
@@ -45,7 +45,7 @@ NVS 未加密，个人包包含可提取的真实凭据，必须只留本机。
 ## Release 与社区上传
 
 ```powershell
-python tools/package-release.py --firmware-build .private/build-v0.5.0
+python tools/package-release.py --firmware-build .private/build-v0.5.1
 ```
 
 只允许公开包：检查实际应用版本、分段哈希、空 NVS、发布标记与已知私人数据。
@@ -58,5 +58,5 @@ python tools/package-release.py --firmware-build .private/build-v0.5.0
 python tools/publish-community.py --publisher PATH_TO_OFFICIAL/publisher.py -- submit [官方标题、简介、使用方法、封面及授权参数]
 ```
 
-该入口只选择已验证的公开 `0.5.0` 固件，自动设置正式社区地址并拒绝外部传入其他 `--firmware`。
+该入口只选择已验证的公开 `0.5.1` 固件，自动设置正式社区地址并拒绝外部传入其他 `--firmware`。
 首次授权与实际审核状态仍由官方发布助手负责；本次不提交或替换此前待审核版本。

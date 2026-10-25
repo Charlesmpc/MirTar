@@ -37,6 +37,31 @@ this is page-layout evidence, not a physical-device screenshot or radio test.
 TypeScript and Windows native worker compilation are checked separately; no actual radio/pairing is exercised by those checks.
 The native worker is built into a content-hashed filename so a running older helper is not overwritten.
 
+### Windows notification subscription recovery
+
+An owner-reported v0.5.0-charles log showed successful cached service/characteristic discovery,
+one successful subscribe and repeated `subscribe_unreachable` failures. This does not establish one unique radio/bond cause.
+Code inspection found that the native helper previously emitted `connected` before CCCD subscription completed;
+the bridge could therefore close it after its five-second application authentication timeout during a slow GATT operation.
+
+The helper now buffers early notifications with byte/count bounds and emits application readiness only after successful
+subscription, followed by the buffered hello in order. It retries `Unreachable` at most three times per attempt,
+then refreshes services and characteristics without cache on a separate connection before reconnecting.
+The usual cached path retains handler-before-MaintainConnection ordering for restored bonded CCCDs.
+Connection IDs isolate late disconnects, notifications, write acknowledgements and commands from a newer link.
+Subscribe attempt, duration, communication status and ATT protocol errors are logged without identifiers or secrets.
+No bonds are removed automatically.
+
+`tools/Test-Bluetooth.ps1` compiles the actual worker and exercises its notification gate, including a pending
+subscription lasting 5.2 seconds, ordered once-only hello delivery, failed subscribe, bounded buffering and close races.
+Three Node worker tests cover readiness, obsolete callbacks and write acknowledgements. All 16 bridge tests and
+TypeScript checks passed; the loopback integration test required execution outside the network-restricted sandbox.
+These are host tests. Actual subscription/reconnect and voice after this fix still require owner validation;
+the card firmware and its prebuilt images are unchanged. Stop/restart the old bridge to load both updated worker files.
+
+Windows API references: [GATT client connection and variable operation time](https://learn.microsoft.com/en-us/windows/apps/develop/devices-sensors/gatt-client)
+and [system-wide GATT cache behavior](https://learn.microsoft.com/en-us/uwp/api/windows.devices.bluetooth.bluetoothcachemode).
+
 ## Build and privacy
 
 Builds use ESP-IDF 5.5.6 and a separate `.private/build-v0.5.0` directory. The verifier compares actual flash segments,

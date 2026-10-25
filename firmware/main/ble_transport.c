@@ -22,7 +22,7 @@ static const ble_uuid128_t service_uuid = MT_UUID(1), rx_uuid = MT_UUID(2), tx_u
 static uint16_t tx_handle;
 static atomic_uint connection = BLE_HS_CONN_HANDLE_NONE;
 static atomic_bool enabled, synced, ready;
-static bool initialized, subscribed;
+static bool initialized, subscribed, faulted;
 static uint8_t own_address, tx_sequence, rx_sequence;
 static int expected_sequence = -1;
 static char name[29], rx_buffer[8193];
@@ -87,6 +87,7 @@ static int gap_event(struct ble_gap_event *event, void *arg) {
     (void)arg;
     switch (event->type) {
     case BLE_GAP_EVENT_CONNECT:
+        printf("MirTar BLE connect status=0x%04x\n", event->connect.status);
         if (event->connect.status) { advertise(); break; }
         if (!enabled) { ble_gap_terminate(event->connect.conn_handle, BLE_ERR_REM_USER_CONN_TERM); break; }
         atomic_store(&connection, event->connect.conn_handle); subscribed = false;
@@ -95,6 +96,7 @@ static int gap_event(struct ble_gap_event *event, void *arg) {
           ble_gap_update_params(event->connect.conn_handle, &p); }
         break;
     case BLE_GAP_EVENT_DISCONNECT:
+        printf("MirTar BLE disconnect reason=0x%04x\n", event->disconnect.reason);
         atomic_store(&connection, BLE_HS_CONN_HANDLE_NONE); atomic_store(&ready, false); subscribed = false;
         rx_used = 0; expected_sequence = -1;
         if (enabled) { notify(MT_BLE_OFF, current_generation, NULL, 0); advertise(); }
@@ -103,6 +105,7 @@ static int gap_event(struct ble_gap_event *event, void *arg) {
         if (event->subscribe.attr_handle == tx_handle) { subscribed = event->subscribe.cur_notify; maybe_ready(); }
         break;
     case BLE_GAP_EVENT_ENC_CHANGE:
+        printf("MirTar BLE encryption status=0x%04x secure=%u\n", event->enc_change.status, (unsigned)secure());
         if (!event->enc_change.status) maybe_ready();
         else ble_gap_terminate(event->enc_change.conn_handle, BLE_ERR_AUTH_FAIL);
         break;
@@ -114,7 +117,9 @@ static int gap_event(struct ble_gap_event *event, void *arg) {
         }
         break;
     // Do not silently delete an existing bond when an unknown peer asks to pair again.
-    case BLE_GAP_EVENT_REPEAT_PAIRING: return BLE_GAP_REPEAT_PAIRING_IGNORE;
+    case BLE_GAP_EVENT_REPEAT_PAIRING:
+        printf("MirTar BLE repeat pairing ignored; physical reset required\n");
+        return BLE_GAP_REPEAT_PAIRING_IGNORE;
     default: break;
     }
     return 0;
@@ -125,6 +130,7 @@ static void host_sync(void) {
 }
 static void host_task(void *arg) { (void)arg; nimble_port_run(); nimble_port_freertos_deinit(); }
 bool mt_ble_start(const char *host_name, uint32_t generation, mt_ble_callback_t callback) {
+    if (faulted) return false;
     mt_ble_stop();
     if (!host_name || !host_name[0] || strlen(host_name) > 20) return false;
     current_generation = generation; notify = callback;
@@ -148,7 +154,7 @@ bool mt_ble_start(const char *host_name, uint32_t generation, mt_ble_callback_t 
 }
 void mt_ble_stop(void) {
     atomic_store(&enabled, false); atomic_store(&ready, false);
-    if (!initialized) return;
+    if (!initialized || faulted) return;
     ble_gap_adv_stop();
     unsigned conn = atomic_load(&connection);
     if (conn != BLE_HS_CONN_HANDLE_NONE) ble_gap_terminate(conn, BLE_ERR_REM_USER_CONN_TERM);
@@ -158,6 +164,23 @@ void mt_ble_stop(void) {
         atomic_store(&connection, BLE_HS_CONN_HANDLE_NONE);
         if (send_lock) { vSemaphoreDelete(send_lock); send_lock = NULL; }
     }
+}
+bool mt_ble_reset_bonds(void) {
+    if (!initialized || faulted) return false;
+    atomic_store(&enabled, false); atomic_store(&ready, false);
+    ble_gap_adv_stop();
+    // Stop connections and the host before clearing its store, while store callbacks
+    // still exist. Deinit frees them, so it must happen after the clear, not before.
+    int stop_rc = nimble_port_stop();
+    if (stop_rc) { faulted = true; printf("MirTar BLE reset stop_error=%d\n", stop_rc); return false; }
+    int clear_rc = ble_store_clear();
+    int deinit_rc = nimble_port_deinit();
+    initialized = false; atomic_store(&synced, false);
+    atomic_store(&connection, BLE_HS_CONN_HANDLE_NONE); subscribed = false;
+    if (send_lock) { vSemaphoreDelete(send_lock); send_lock = NULL; }
+    faulted = deinit_rc != ESP_OK;
+    printf("MirTar BLE reset clear_error=%d deinit_error=%d\n", clear_rc, deinit_rc);
+    return clear_rc == 0 && deinit_rc == ESP_OK;
 }
 bool mt_ble_send(const void *data, size_t size, bool binary) {
     if (!size || size > 8192 || !atomic_load(&ready) || xSemaphoreTake(send_lock, pdMS_TO_TICKS(1200)) != pdTRUE) return false;

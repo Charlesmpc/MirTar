@@ -10,3 +10,21 @@ void mt_disconnect(mt_state_t *s) {
     /* An accepted/uncertain submission must not be automatically replayed. */
     s->page = MT_MACHINES;
 }
+void mt_ble_wait_start(mt_state_t *s, int64_t now) {
+    if (!s || s->transport != MT_BLUETOOTH || s->page != MT_CONNECTING || s->ble_waiting) return;
+    s->ble_waiting = true; s->ble_wait_since = now; s->ble_reset_offered = false;
+}
+void mt_ble_wait_clear(mt_state_t *s) {
+    if (!s) return;
+    s->ble_waiting = s->ble_reset_offered = false; s->ble_wait_since = 0;
+}
+bool mt_ble_can_offer_reset(const mt_state_t *s) {
+    return s && s->transport == MT_BLUETOOTH && s->page == MT_CONNECTING &&
+        s->ble_waiting && s->ble_reset_offered && !s->bound && !s->recording;
+}
+bool mt_ble_wait_update(mt_state_t *s, int64_t now) {
+    if (!s || s->transport != MT_BLUETOOTH || s->page != MT_CONNECTING || !s->ble_waiting ||
+        s->ble_reset_offered || s->bound || s->recording || now < s->ble_wait_since ||
+        now - s->ble_wait_since < 60000000) return false;
+    s->ble_reset_offered = true; return true;
+}

@@ -28,7 +28,7 @@ plaintext traffic and must stay on a trusted LAN.
 
 The OS integration is a separate adapter layer. **Windows is implemented today;
 macOS and Linux bridges are planned.** The current Agent adapter is Codex.
-**Development branch: v0.5.0**, rebuilt from the verified v0.3.1 baseline.
+**Development branch: v0.5.1**, rebuilt from the verified v0.3.1 baseline.
 The new home has **Server list / Add server / Add config-file**. Bluetooth enrollment exchanges host identity and binding;
 file import uses an explicitly opened card hotspot. Each host owns its own optional Wi-Fi settings.
 The new flows need physical-device acceptance; earlier v0.3.x owner testing is not evidence for this revision.
@@ -57,6 +57,11 @@ voice limits still apply.
 3. Select a saved host, then Bluetooth (default) or that host's configured Wi-Fi.
 4. OK records; OK again submits. UP/DOWN scroll; hold them to change sessions. Hold OK to return home.
 
+**v0.5.1 Bluetooth recovery:** After one minute without completing binding, the connection screen offers a confirmed
+pairing reset. It clears all badge Bluetooth bonds while retaining hosts and Wi-Fi. Stop the bridge and run
+`.\tools\Start-Bridge.ps1 -ResetBluetoothPairing` to remove its matching Windows bond and enter a fresh PIN.
+See [Bluetooth recovery](docs/server-onboarding.md#bluetooth-recovery-after-one-minute).
+
 ## Get started
 
 Windows, BLE, Node.js **24.13.0+**, Edge, and a signed-in Codex desktop session are required.
@@ -84,13 +89,13 @@ v0.3.1 compiled settings and v0.4.0 stored settings are not automatically migrat
 
 - [Complete server setup and file format](docs/server-onboarding.md) / [中文](docs/server-onboarding.zh_CN.md)
 - [Build and flash](docs/device-quickstart.md) / [中文](docs/device-quickstart.zh_CN.md)
-- [Validation status](docs/validation/server-onboarding-0.5.0.md)
+- [Validation status](docs/validation/server-onboarding-0.5.1.md)
 
 This development version has not been released or submitted to the community.
 Build the credential-free image locally; preserve earlier verified images for rollback.
 
-The planned public release is **0.5.0**. A default build never reads personal config and starts with no saved hosts on fresh NVS.
-Use `Build-PersonalFirmware.ps1` for a separately labeled local image containing an NVS preset. Its app remains version 0.5.0;
+The planned public release is **0.5.1**. A default build never reads personal config and starts with no saved hosts on fresh NVS.
+Use `Build-PersonalFirmware.ps1` for a separately labeled local image containing an NVS preset. Its app remains version 0.5.1;
 its package and card label include the selected personal suffix. Personal images must never enter a Release or community upload.
 One public codebase is maintained; the old private history archive does not need ongoing development.
 See [build variants and publication guards](docs/build-variants.zh_CN.md).

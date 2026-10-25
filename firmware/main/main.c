@@ -60,11 +60,12 @@ static int home_index;
 static char *pending_config;
 static int64_t config_apply_at, portal_close_at, pair_deadline, pair_close_at, wifi_deadline;
 static char pair_nonce[33], pair_server_id[41];
-static bool pair_finished;
+static bool pair_finished, reset_confirm_yes, reset_done;
 static void show_home(void);
 static void read_settings(void);
 static void enter_pairing(void);
 static void enter_config_upload(void);
+static void show_ble_recovery(void);
 
 static const char *str(cJSON *o, const char *key) {
     cJSON *v = cJSON_GetObjectItemCaseSensitive(o, key);
@@ -191,6 +192,7 @@ static bool disconnect_target(void) {
     cJSON_Delete(pair_candidate);pair_candidate=NULL;pair_deadline=pair_close_at=0;pair_finished=false;
     memset(pair_nonce,0,sizeof(pair_nonce));
     generation++;
+    mt_ble_wait_clear(&state);
     mt_ble_stop();
     if (websocket) { esp_websocket_client_stop(websocket); esp_websocket_client_destroy(websocket); websocket = NULL; }
     if (wifi_started) { wifi_started = false; esp_wifi_stop(); }
@@ -248,6 +250,7 @@ static void connect_target(void) {
         const char *name = targets[target_index].bluetooth_name;
         if (!name[0]) name = targets[target_index].name;
         if (!mt_ble_start(name, generation, ble_event)) { status("蓝牙启动失败"); render("长按 OK 返回\n\n可以选择 Wi-Fi 连接"); return; }
+        mt_ble_wait_start(&state, esp_timer_get_time());
         status("等待蓝牙连接"); render("请启动电脑上的桥接\n\n首次连接请在 Windows\n输入卡片上的配对码\n\n已配对的电脑会自动连接");
     } else {
         wifi_count=0;wifi_index=0;memset(wifi_networks,0,sizeof(wifi_networks));
@@ -260,6 +263,25 @@ static void connect_target(void) {
         wifi_deadline=esp_timer_get_time()+30000000;
         status("正在连接主机 Wi-Fi");render("使用所选主机的 Wi-Fi\n\n30 秒未连上会提示失败\n\n长按 OK 返回");
     }
+}
+static void show_ble_recovery(void) {
+    status("OK 重置配对  长按 OK 返回");
+    render("蓝牙连接超过 1 分钟\n\n仍在等待电脑连接\n请确认桥接已启动\n\n> 重置蓝牙配对\n\n按 OK 查看确认说明");
+}
+static void show_ble_reset_confirm(void) {
+    char body[340];
+    snprintf(body,sizeof(body),"清除卡片全部蓝牙配对？\n其他电脑也需重新配对\n主机和 Wi-Fi 配置保留\n\n%s 取消，继续等待\n\n%s 清除并重新配对",
+        reset_confirm_yes?" ":">",reset_confirm_yes?">":" ");
+    state.page=MT_BLE_RESET_CONFIRM;status("上下选择  OK 确认");render(body);
+}
+static void reset_ble_pairing(void) {
+    stop_audio();if(atomic_load(&audio_busy))return;
+    generation++;mt_ble_wait_clear(&state);
+    status("正在清除蓝牙配对");render(NULL);
+    reset_done=mt_ble_reset_bonds();mt_disconnect(&state);state.page=MT_BLE_RESET_GUIDE;
+    if(!reset_done){status("重置失败，请重启后重试");render("主机和 Wi-Fi 配置保留\n\n长按 OK 返回\n仍失败请重启卡片");return;}
+    status("OK 重新连接  长按 OK 返回");
+    render("卡片蓝牙配对已清除\n主机和 Wi-Fi 已保留\n\n电脑删除旧 MirTar 配对\n或启动桥接时加参数\n-ResetBluetoothPairing\n\n按 OK 重新连接");
 }
 static void wifi_event(void *arg, esp_event_base_t base, int32_t id, void *data) {
     (void)data; uint32_t current = (uint32_t)(uintptr_t)arg;
@@ -334,6 +356,8 @@ static void handle_json(const char *data) {
     cJSON *o = cJSON_Parse(data); if (!o) return;
     if(state.page==MT_PAIRING||state.page==MT_PAIR_CONFIRM){handle_pair_offer(o);cJSON_Delete(o);return;}
     const char *type = str(o, "type");
+    bool confirming_reset=state.page==MT_BLE_RESET_CONFIRM;
+    if(confirming_reset&&strcmp(type,"challenge")&&strcmp(type,"bound")){cJSON_Delete(o);return;}
     if (!strcmp(type, "challenge")) {
         const char *challenge = str(o, "challenge"), *secret = targets[target_index].secret;
         unsigned char digest[32]; char proof[65];
@@ -341,9 +365,11 @@ static void handle_json(const char *data) {
             (const unsigned char *)secret, strlen(secret), (const unsigned char *)challenge, strlen(challenge), digest)) { cJSON_Delete(o); return; }
         for (int i = 0; i < 32; i++) snprintf(proof + i*2, 3, "%02x", digest[i]);
         cJSON *auth = message("auth"); cJSON_AddStringToObject(auth, "proof", proof); send_json(auth);
-        status("正在绑定电脑"); render(NULL);
+        if(!confirming_reset){status("正在绑定电脑");render(NULL);}
     } else if (!strcmp(type, "bound")) {
         state.bound = true;
+        mt_ble_wait_clear(&state);
+        if(confirming_reset)state.page=MT_CONNECTING;
         cJSON *sessions = cJSON_GetObjectItem(o, "sessions"); state.session_count = 0;
         cJSON *item;
         cJSON_ArrayForEach(item, sessions) {
@@ -391,6 +417,18 @@ static void handle_key(int key, int action) {
         manual_machine_selection=true;home_index=target_count?0:1;show_home();return;
     }
     if(state.page==MT_SETUP)return;
+    if(state.page==MT_BLE_RESET_CONFIRM) {
+        if(action!=BSP_BTN_CLICK)return;
+        if(key!=BSP_BTN_OK){reset_confirm_yes=!reset_confirm_yes;show_ble_reset_confirm();}
+        else if(reset_confirm_yes)reset_ble_pairing();
+        else{state.page=MT_CONNECTING;show_ble_recovery();}
+        return;
+    }
+    if(state.page==MT_BLE_RESET_GUIDE){if(reset_done&&action==BSP_BTN_CLICK&&key==BSP_BTN_OK)connect_target();return;}
+    if(state.page==MT_CONNECTING) {
+        if(action==BSP_BTN_CLICK&&key==BSP_BTN_OK&&mt_ble_can_offer_reset(&state)){reset_confirm_yes=false;show_ble_reset_confirm();}
+        return;
+    }
     if(state.page==MT_PAIRING)return;
     if(state.page==MT_PAIR_CONFIRM) {
         if(action!=BSP_BTN_CLICK||key!=BSP_BTN_OK||!pair_candidate)return;
@@ -494,16 +532,22 @@ void app_main(void) {
                 printf("MirTar link: mode=%s heap=%u largest=%u\n", state.transport == MT_BLUETOOTH ? "BLE" : "Wi-Fi",
                     (unsigned)esp_get_free_heap_size(), (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
                 cJSON *o = message("hello"); cJSON_AddNumberToObject(o, "version", 1); cJSON_AddStringToObject(o, "deviceId", device_id); cJSON_AddStringToObject(o, "bootId", boot_id); send_json(o);
-                status("正在校验电脑绑定"); render(NULL); break;
+                if(state.page!=MT_BLE_RESET_CONFIRM){status("正在校验电脑绑定");render(NULL);}break;
             }
             case EV_WS_OFF:
                 if(state.page==MT_PAIRING||state.page==MT_PAIR_CONFIRM) {
                     if(!pair_finished){cJSON_Delete(pair_candidate);pair_candidate=NULL;pair_nonce[0]=0;state.page=MT_PAIRING;status("蓝牙断开，等待重新添加");render("请在电脑重试\n\n长按 OK 取消");}break;
                 }
-                atomic_store(&audio_submit, false); atomic_store(&audio_running, false); mt_disconnect(&state);
-                if (!manual_machine_selection) { state.page = MT_CONNECTING; status("电脑连接断开，重试中"); render(NULL); }
+                { bool confirming=state.page==MT_BLE_RESET_CONFIRM;
+                  atomic_store(&audio_submit, false); atomic_store(&audio_running, false); mt_disconnect(&state);
+                  if(confirming){state.page=MT_BLE_RESET_CONFIRM;break;}
+                  if (!manual_machine_selection) { state.page = MT_CONNECTING;mt_ble_wait_start(&state,esp_timer_get_time());
+                    if(mt_ble_can_offer_reset(&state))show_ble_recovery();else{status("电脑连接断开，重试中");render(NULL);} }
+                }
                 break;
             case EV_BLE_PIN: {
+                if(state.page==MT_BLE_RESET_CONFIRM)break;
+                if(state.page==MT_CONNECTING){mt_ble_wait_clear(&state);mt_ble_wait_start(&state,esp_timer_get_time());}
                 char body[160]; snprintf(body, sizeof(body), "蓝牙配对码\n\n%06d\n\n请在 Windows 输入\n\n长按 OK 取消", event.key);
                 status("等待 Windows 配对"); render(body); break;
             }
@@ -520,6 +564,7 @@ void app_main(void) {
             free(event.json);
         }
         int64_t now = esp_timer_get_time();
+        if(mt_ble_wait_update(&state,now))show_ble_recovery();
         if(pending_config&&now>=config_apply_at) {
             cJSON *candidate=mt_config_parse(pending_config,strlen(pending_config)+1);free(pending_config);pending_config=NULL;
             if(!candidate||mt_config_save(candidate)!=ESP_OK){cJSON_Delete(candidate);mt_portal_status("error");status("保存失败，请重新上传");render(NULL);}

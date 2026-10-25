@@ -1,6 +1,6 @@
 # Server onboarding (development build)
 
-This branch starts from v0.3.1, retaining the reading skin and Codex voice path. Its version is `0.5.0`.
+This branch starts from v0.3.1, retaining the reading skin and Codex voice path. Its version is `0.5.1`.
 It does not replace the v0.4.0 community submission. Compilation and host tests do not establish device acceptance.
 
 The home screen has **Server list** when hosts exist, plus **Add server** and **Add config-file**.
@@ -26,6 +26,23 @@ over authenticated/encrypted BLE. The card acknowledges only after saving. A can
 an unused computer-side device entry for retry; keys and Bluetooth bonds are not silently erased or rotated.
 The stable server ID survives display-name changes. Existing bridge processes need restarting to load new bindings.
 With four hosts saved, update an existing entry through a file instead.
+
+## Bluetooth recovery after one minute
+
+When an existing host cannot complete Bluetooth binding for one minute, the connecting/retrying screen offers
+**Reset Bluetooth pairing**. Repeated disconnects do not restart the timer. Successful binding removes the offer.
+
+1. Press OK, select **Clear and pair again** with UP/DOWN, then OK. Cancel is selected initially.
+2. This clears **all badge Bluetooth bonds**, while retaining servers, application binding keys and per-host Wi-Fi.
+   Older versions did not map server IDs to Bluetooth identities, so selective per-computer clearing is not reliable.
+   Other computers must pair again too.
+3. Stop the computer's bridge and run `./tools/Start-Bridge.ps1 -ResetBluetoothPairing`.
+   This explicit option removes only the Windows pairing whose name exactly matches this bridge's configured Bluetooth name.
+   If Windows still uses an old `MirTar-Add-...` name, remove that badge entry manually in Windows Bluetooth settings.
+4. Press OK on the badge to reconnect, then enter its new six-digit PIN in the Windows dialog. Continue in the existing session.
+
+Hold OK to exit. Timing out alone never removes a bond, erases NVS or replays audio. Failed reset is reported rather than
+displaying success. Wi-Fi, new-server enrollment and config upload do not offer this recovery action.
 
 ## Add config-file: local hotspot upload
 
@@ -74,7 +91,7 @@ Compiled v0.3.1 config and v0.4.0's old NVS format are not automatically migrate
 
 Run `npm.cmd run check`, `npm.cmd test`, and `npm.cmd run test:portal`.
 Firmware builds use PowerShell 7 with ESP-IDF 5.5.6: `.\tools\Build-Firmware.ps1`.
-The merged output is `.private/build-v0.5.0/MirTar-full.bin`, flashed at **0x0**.
+The merged output is `.private/build-v0.5.1/MirTar-full.bin`, flashed at **0x0**.
 With a compatible partition layout, segmented `Flash-Firmware.ps1 -Port COMx -PreserveNvs` preserves NVS;
 add `-WhatIf` for a device-free preview. Preserve original files and verified firmware first.
 No automatic flashing is authorized. Public builds never contain actual credentials; their `-Config` is disabled.
