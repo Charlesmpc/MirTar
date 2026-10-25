@@ -47,6 +47,8 @@ static bool wifi_valid(const cJSON *wifi) {
 bool mt_config_valid(const cJSON *config) {
     const cJSON *version=cJSON_GetObjectItemCaseSensitive(config,"version"),*servers=cJSON_GetObjectItemCaseSensitive(config,"servers");
     const char *skin=field(config,"skin");
+    const cJSON *flavor=cJSON_GetObjectItemCaseSensitive(config,"buildFlavor");
+    if(flavor&&!identifier(field(config,"buildFlavor"),20))return false;
     if(!cJSON_IsObject(config)||!unique_keys(config)||!cJSON_IsNumber(version)||version->valuedouble!=2||
        !identifier(field(config,"deviceId"),40)||!skin||(strcmp(skin,"reading")&&strcmp(skin,"terminal"))||
        !cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(config,"allowLanPlaintext"))||

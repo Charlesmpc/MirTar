@@ -1,4 +1,4 @@
-# Server onboarding validation — 0.5.0-dev.1
+# Server onboarding validation — 0.5.0
 
 This development branch starts from the v0.3.1 public snapshot. It selectively reuses the v0.4.0 hotspot server,
 QR renderer and Windows build fixes, with a new file-only page and host-owned v2 configuration.
@@ -39,10 +39,15 @@ The native worker is built into a content-hashed filename so a running older hel
 
 ## Build and privacy
 
-Builds use ESP-IDF 5.5.6 and a separate `.private/build-v0.5.0-dev.1` directory. The verifier compares actual flash segments,
+Builds use ESP-IDF 5.5.6 and a separate `.private/build-v0.5.0` directory. The verifier compares actual flash segments,
 records version/hash and audits the merged binary against known local private credentials/identifiers.
 Only a successful build and generated manifest confirm completion. The manifest must retain `deviceTested: false`.
 Source/index privacy guards also run before committing. Private config/export/backup files and all build outputs stay ignored.
+
+Public v0.5.0 additionally requires actual app version 0.5.0, no preset NVS data and explicit publishable/public manifest flags.
+Personal variants share the same app but add a local NVS preset and a display suffix; their manifest forbids publication.
+Five bundle checks cover clean export, relabeled personal data, falsified flags/version, segment mutation and a cross-page
+SDK NVS generation/decode round trip. Successful personal readback does not establish physical boot/bond behavior.
 
 ## Physical acceptance pending
 

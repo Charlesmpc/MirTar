@@ -1,6 +1,6 @@
 # Server onboarding (development build)
 
-This branch starts from v0.3.1, retaining the reading skin and Codex voice path. Its version is `0.5.0-dev.1`.
+This branch starts from v0.3.1, retaining the reading skin and Codex voice path. Its version is `0.5.0`.
 It does not replace the v0.4.0 community submission. Compilation and host tests do not establish device acceptance.
 
 The home screen has **Server list** when hosts exist, plus **Add server** and **Add config-file**.
@@ -74,10 +74,11 @@ Compiled v0.3.1 config and v0.4.0's old NVS format are not automatically migrate
 
 Run `npm.cmd run check`, `npm.cmd test`, and `npm.cmd run test:portal`.
 Firmware builds use PowerShell 7 with ESP-IDF 5.5.6: `.\tools\Build-Firmware.ps1`.
-The merged output is `.private/build-v0.5.0-dev.1/MirTar-full.bin`, flashed at **0x0**.
+The merged output is `.private/build-v0.5.0/MirTar-full.bin`, flashed at **0x0**.
 With a compatible partition layout, segmented `Flash-Firmware.ps1 -Port COMx -PreserveNvs` preserves NVS;
 add `-WhatIf` for a device-free preview. Preserve original files and verified firmware first.
-No automatic flashing is authorized. Builds never embed actual credentials; compile-time `-Config` is disabled.
+No automatic flashing is authorized. Public builds never contain actual credentials; their `-Config` is disabled.
+The separate `Build-PersonalFirmware.ps1` packages private NVS presets; see [build variants](build-variants.zh_CN.md).
 
 Press OK to record and again to submit; UP/DOWN scroll, hold them to switch sessions, hold OK to return home.
 Codex still owns sessions and ASR. No TTS, Cursor, other host OS or OTA implementation is added.

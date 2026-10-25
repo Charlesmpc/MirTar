@@ -1,6 +1,6 @@
 # 主机添加与配置导入（开发版）
 
-本分支从 v0.3.1 重新开发，版本标识为 `0.5.0-dev.1`。保留专注阅读皮肤与 Codex 语音链路。
+本分支从 v0.3.1 重新开发，版本标识为 `0.5.0`。保留专注阅读皮肤与 Codex 语音链路。
 它未替换已提交社区审核的 v0.4.0；主机检查和编译不代表新增流程已经真机通过。
 
 ## 卡片首页
@@ -99,9 +99,10 @@ npm.cmd run test:portal
 .\tools\Flash-Firmware.ps1 -Port COMx -PreserveNvs -WhatIf
 ```
 
-默认固件在 `.private/build-v0.5.0-dev.1/MirTar-full.bin`，完整镜像从 **0x0** 刷入。
+默认固件在 `.private/build-v0.5.0/MirTar-full.bin`，完整镜像从 **0x0** 刷入。
 原分区兼容时用 `-PreserveNvs` 分段刷写；完整镜像会影响已有配置，刷前保留旧文件和已验证固件。
-未经用户明确授权，不自动刷机。固件不嵌入实际配置；旧 `-Config` 构建参数已禁用。
+未经用户明确授权，不自动刷机。公开构建不读取实际配置；个人预置请使用独立的
+`Build-PersonalFirmware.ps1`，见[构建与发布隔离](build-variants.zh_CN.md)。公开构建的 `-Config` 参数禁用。
 
 连接后，OK 开始录音，再按 OK 发送；上下翻阅回复，长按上下切会话，长按 OK 回首页。
 原生会话和 ASR 仍由 Codex 提供。TTS、Cursor、其他 OS、OTA 不在本次实现中。

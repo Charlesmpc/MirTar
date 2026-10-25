@@ -28,7 +28,7 @@ plaintext traffic and must stay on a trusted LAN.
 
 The OS integration is a separate adapter layer. **Windows is implemented today;
 macOS and Linux bridges are planned.** The current Agent adapter is Codex.
-**Development branch: v0.5.0-dev.1**, rebuilt from the verified v0.3.1 baseline.
+**Development branch: v0.5.0**, rebuilt from the verified v0.3.1 baseline.
 The new home has **Server list / Add server / Add config-file**. Bluetooth enrollment exchanges host identity and binding;
 file import uses an explicitly opened card hotspot. Each host owns its own optional Wi-Fi settings.
 The new flows need physical-device acceptance; earlier v0.3.x owner testing is not evidence for this revision.
@@ -89,6 +89,12 @@ v0.3.1 compiled settings and v0.4.0 stored settings are not automatically migrat
 This development version has not been released or submitted to the community.
 Build the credential-free image locally; preserve earlier verified images for rollback.
 
+The planned public release is **0.5.0**. A default build never reads personal config and starts with no saved hosts on fresh NVS.
+Use `Build-PersonalFirmware.ps1` for a separately labeled local image containing an NVS preset. Its app remains version 0.5.0;
+its package and card label include the selected personal suffix. Personal images must never enter a Release or community upload.
+One public codebase is maintained; the old private history archive does not need ongoing development.
+See [build variants and publication guards](docs/build-variants.zh_CN.md).
+
 ## Scope and limitations
 
 Implemented adapters: Windows host and Codex Agent. Both BLE and trusted-LAN Wi-Fi
@@ -110,7 +116,7 @@ Real values belong in ignored `.private/` device/bridge files. Device configurat
 `servers[]`, with optional `wifi: {ssid, password, url}` under each host. Bluetooth-only hosts omit it or use null.
 There is no global Wi-Fi list. Up to four hosts are stored on the card.
 
-Firmware does not embed actual credentials. Import/enrollment stores them in the card's unencrypted NVS.
+Public firmware does not contain actual credentials. Import/enrollment or a local personal preset stores them in unencrypted NVS.
 Keep personalized legacy firmware, ELF, recordings, logs, native session IDs, private configuration and backups out of Git/releases. Bluetooth requires authenticated encryption and then HMAC binding.
 Wi-Fi is explicitly **unencrypted trusted-LAN** transport, not a public Internet
 endpoint. No automatic firewall or port-forward changes are made.

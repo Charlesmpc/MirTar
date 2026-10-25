@@ -8,6 +8,8 @@ LV_FONT_DECLARE(mirtar_font_16);
 static lv_obj_t *top, *battery_text, *header, *viewport, *text, *footer, *setup_qr;
 static lv_font_t font;
 static uint32_t paper, ink, muted, accent;
+static char build_flavor[21];
+void mt_ui_flavor(const char *name) { snprintf(build_flavor,sizeof(build_flavor),"%s",name?name:""); }
 void mt_ui_init(bool reading_skin) {
     paper = reading_skin ? 0x172033 : 0x122021;
     ink = reading_skin ? 0xe7edf8 : 0xeef4ec;
@@ -50,7 +52,8 @@ void mt_ui_render(const mt_state_t *s, const char *status, const char *body, int
     if (battery >= 0) snprintf(info, sizeof(info), "%d%%", battery);
     else snprintf(info, sizeof(info), "--");
     lv_label_set_text(battery_text, info);
-    snprintf(info, sizeof(info), "MirTar %s", esp_app_get_description()->version);
+    if(build_flavor[0])snprintf(info,sizeof(info),"%s-%s",esp_app_get_description()->version,build_flavor);
+    else snprintf(info, sizeof(info), "MirTar %s", esp_app_get_description()->version);
     lv_label_set_text(top, s->bound ? s->target_name : s->page == MT_HOME || s->page == MT_MACHINES ? info : s->page == MT_SETUP ? "Config upload" : s->transport == MT_BLUETOOTH ? "Bluetooth" : s->wifi ? "Wi-Fi" : "Offline");
     if (s->page != MT_SETUP) { if (setup_qr) lv_obj_add_flag(setup_qr, LV_OBJ_FLAG_HIDDEN); lv_obj_set_pos(text, 4, 4); }
     if (s->page == MT_READING && s->selected < s->session_count) {

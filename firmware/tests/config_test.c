@@ -35,7 +35,10 @@ int main(int argc,char **argv){
         json+=offset;cJSON *input=mt_config_parse(json,count-offset+1);assert(mt_config_valid(input));
         printf("Private version 2 file validated: %d hosts; credential values suppressed.\n",cJSON_GetArraySize(cJSON_GetObjectItem(input,"servers")));cJSON_Delete(input);return 0;
     }
-    cJSON *base=mt_config_load();assert(base&&mt_config_valid(base));assert(!mt_config_server_wifi(base,0));
+    cJSON *base=mt_config_load();assert(base&&mt_config_valid(base));assert(!mt_config_server_wifi(base,0));assert(cJSON_GetArraySize(cJSON_GetObjectItem(base,"servers"))==0);
+    cJSON_AddStringToObject(base,"buildFlavor","test-only");assert(mt_config_valid(base));
+    cJSON_ReplaceItemInObjectCaseSensitive(base,"buildFlavor",cJSON_CreateString("not a valid label"));assert(!mt_config_valid(base));
+    cJSON_DeleteItemFromObjectCaseSensitive(base,"buildFlavor");
     cJSON *first=with_server("OfficeLaptop","OfficeNetwork"),*second=with_server("HomeLaptop","HomeNetwork");
     cJSON *both=mt_config_import(first,second);assert(both);
     assert(!strcmp(text(mt_config_server_wifi(both,0),"ssid"),"OfficeNetwork"));

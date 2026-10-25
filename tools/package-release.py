@@ -1,4 +1,4 @@
-"""Package a committed release; private configuration and firmware stay local."""
+"""Package committed source and optional public firmware; personal presets stay local."""
 import argparse
 import hashlib
 import json
@@ -6,10 +6,13 @@ import re
 import subprocess
 import zipfile
 from pathlib import Path
+from firmware_bundle import require_public,digest
+from audit_firmware import audit_image
 
 root = Path(__file__).resolve().parent.parent
 parser = argparse.ArgumentParser()
 parser.add_argument('--prerelease', action='store_true', help='Mark a preview release without changing its firmware version')
+parser.add_argument('--firmware-build',type=Path,help='Only a verified public bundle may be added')
 args = parser.parse_args()
 def git(*args):
     return subprocess.check_output(['git', '-C', str(root), *args])
@@ -19,6 +22,11 @@ version = json.loads(git('show', f'{commit}:package.json'))['version']
 if not re.fullmatch(r'\d+\.\d+\.\d+(?:-[a-z]+\.\d+)?', version):
     raise SystemExit('Invalid release version')
 tag = 'v' + version
+firmware_build=args.firmware_build or root/('.private/build-v'+version)
+firmware_manifest=None
+if args.firmware_build or (firmware_build/'MirTar-full.bin').exists():
+    firmware_manifest=require_public(firmware_build,version)
+    audit_image(firmware_build/'MirTar-full.bin',root)
 output = root / '.private' / 'releases' / tag
 output.mkdir(parents=True, exist_ok=True)
 audit_path = output / 'source-audit.local.json'
@@ -74,12 +82,17 @@ for asset, prefix in [(source, f'MirTar-{tag}/'), (runtime, 'MirTar-windows-brid
                 raise SystemExit('Unexpected archive member: ' + entry.filename)
 
 assets = [{'name': path.name, 'bytes': path.stat().st_size, 'sha256': hashlib.sha256(path.read_bytes()).hexdigest()} for path in [source, runtime]]
+if firmware_manifest:
+    public_image=output/'MirTar-full.bin';public_receipt=output/'firmware-manifest.json'
+    public_image.write_bytes((firmware_build/'MirTar-full.bin').read_bytes())
+    public_receipt.write_text(json.dumps(firmware_manifest,indent=2)+'\n',encoding='utf-8')
+    assets.extend({'name':path.name,'bytes':path.stat().st_size,'sha256':digest(path.read_bytes())} for path in [public_image,public_receipt])
 manifest = {'version': version, 'tag': tag, 'sourceCommit': commit, 'prerelease': args.prerelease or '-' in version,
-            'configuredFirmwareIncluded': False, 'sourceFiles': len(files), 'windowsBridgeFiles': len(runtime_files),
+            'configuredFirmwareIncluded': False, 'distribution':'public','firmwareIncluded':bool(firmware_manifest), 'sourceFiles': len(files), 'windowsBridgeFiles': len(runtime_files),
             'assets': assets, 'currentSourceAuditPassed': True, 'historyPrivacyReviewRequired': not audit['historyPrivateInfoClean']}
 manifest_path = output/'release-manifest.json'
 manifest_path.write_text(json.dumps(manifest, indent=2)+'\n', encoding='utf-8')
 (output/'SHA256SUMS').write_text(''.join(hashlib.sha256(path.read_bytes()).hexdigest()+'  '+path.name+'\n'
-                                      for path in [source, runtime, manifest_path]), encoding='utf-8')
+                                      for path in [output/item['name'] for item in assets]+[manifest_path]), encoding='utf-8')
 print(json.dumps(manifest))
 print('ZIP members match audited Git blobs; no configured firmware or private files packaged.')

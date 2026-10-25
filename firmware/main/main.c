@@ -216,7 +216,7 @@ static void read_settings(void) {
         targets[target_count++]=(target_t){.name=str(item,"name"),.secret=str(item,"secret"),
             .bluetooth_name=str(item,"bluetoothName"),.url=str(cJSON_GetObjectItem(item,"wifi"),"url")};
     }
-    if(bsp_lvgl_lock(200)){mt_ui_skin(!strcmp(str(device_config,"skin"),"reading"));bsp_lvgl_unlock();}
+    if(bsp_lvgl_lock(200)){mt_ui_skin(!strcmp(str(device_config,"skin"),"reading"));mt_ui_flavor(str(device_config,"buildFlavor"));bsp_lvgl_unlock();}
 }
 static void enter_config_upload(void) {
     if(!disconnect_target())return;

@@ -18,6 +18,7 @@ $full = Join-Path $build 'MirTar-full.bin'
 if ((Get-VerifiedSha256 $full) -ne $manifest.sha256) { throw 'Firmware hash does not match the verified build' }
 if ($manifest.chip -ne 'esp32c3' -or $manifest.sdk -ne '5.5.6') { throw 'Unexpected firmware target' }
 if ($PreserveNvs) {
+    if ($manifest.configurationLocation -eq 'nvs') { throw 'PreserveNvs would skip the personal preset. Use a complete personal-image flash; it replaces existing configuration and Bluetooth bonds.' }
     $parts = Get-Content -LiteralPath (Join-Path $build 'flasher_args.json') -Raw | ConvertFrom-Json
     $flashArgs = @()
     foreach ($property in $parts.flash_files.PSObject.Properties) {
@@ -30,6 +31,7 @@ if ($PreserveNvs) {
 } else {
     $flashArgs = @('0x0', $full)
     Write-Host 'Merged flash replaces the application and may reset stored settings. No whole-chip erase is used.'
+    if ($manifest.configurationLocation -eq 'nvs') { Write-Host 'PERSONAL PRESET: existing NVS and Bluetooth bonds will be replaced.' }
 }
 $pythonExe = Join-Path $repoRoot '.private\toolchains\idf-tools\python_env\idf5.5_py3.12_env\Scripts\python.exe'
 if ($PSCmdlet.ShouldProcess($Port, "Flash verified MirTar image SHA256 $($manifest.sha256)")) {

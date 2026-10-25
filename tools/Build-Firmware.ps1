@@ -1,12 +1,13 @@
-param([string]$Config, [switch]$CompileCheck, [string]$BuildDirectory, [ValidateRange(1,32)][int]$Jobs = 2)
+param([string]$Config, [switch]$CompileCheck, [string]$BuildDirectory, [ValidateRange(1,32)][int]$Jobs = 2, [string]$ExportDirectory)
 $ErrorActionPreference = 'Stop'
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-if ($Config) { throw 'Firmware does not embed credentials. Use Add config-file on the card to import the version 2 device configuration.' }
+if ($Config) { throw 'Public builds never read private config. Use Build-PersonalFirmware.ps1 -Config PRIVATE_FILE for a personal image.' }
 if (!$BuildDirectory) {
     $buildVersion = (Get-Content -LiteralPath (Join-Path $repoRoot 'package.json') -Raw | ConvertFrom-Json).version
     $BuildDirectory = Join-Path $repoRoot ('.private\build-v' + $buildVersion)
 }
 $BuildDirectory = [IO.Path]::GetFullPath($BuildDirectory)
+if ($ExportDirectory) { $ExportDirectory=[IO.Path]::GetFullPath($ExportDirectory) }
 $env:IDF_TOOLS_PATH = Join-Path $repoRoot '.private\toolchains\idf-tools'
 $env:CCACHE_DISABLE = '1'
 Remove-Item Env:MIRTAR_DEVICE_CONFIG -ErrorAction SilentlyContinue
@@ -27,5 +28,9 @@ try {
     if ($LASTEXITCODE) { throw 'Firmware merge failed' }
     python (Join-Path $repoRoot 'tools\verify_firmware.py') $BuildDirectory
     if ($LASTEXITCODE) { throw 'Firmware verification failed' }
+    if ($ExportDirectory) {
+        python (Join-Path $repoRoot 'tools\firmware_bundle.py') $BuildDirectory --export ([IO.Path]::GetFullPath($ExportDirectory))
+        if ($LASTEXITCODE) { throw 'Public artifact export failed' }
+    }
     if ($CompileCheck) { Write-Host 'Build checked. Runtime configuration is performed on the card setup page.' }
 } finally { Pop-Location }
