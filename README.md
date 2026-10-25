@@ -28,9 +28,14 @@ plaintext traffic and must stay on a trusted LAN.
 
 The OS integration is a separate adapter layer. **Windows is implemented today;
 macOS and Linux bridges are planned.** The current Agent adapter is Codex.
-**v0.3.1 includes both local Wi-Fi and Bluetooth** (the default), with fixes for
-Bluetooth connection/reconnection. The owner reported a successful physical-device
-voice test after the fix. A new demo is being prepared.
+**v0.4.0 adds runtime setup:** select Wi-Fi to open a password-protected badge
+hotspot when no network is saved, or automatically after 30 seconds without a
+Wi-Fi connection. Scan the on-screen QR and open `http://192.168.4.1` to save
+networks and import your own computer configuration. The firmware contains no
+personal Wi-Fi or binding credentials. Bluetooth-only setup does not require a
+home Wi-Fi connection. [Setup guide](docs/wifi-setup.md).
+
+This setup revision is a preview; build and host checks do not replace physical-device acceptance.
 
 ## How it works
 
@@ -62,30 +67,34 @@ voice limits still apply.
 
 You need an AI Passport, BLE-capable Windows, Node.js **24.13.0+**, Microsoft Edge,
 a signed-in Codex desktop application and its executable. Firmware builds use
-**ESP-IDF 5.5.6 / LVGL 9.5.0** and Python; configuration/build helpers use PowerShell 7.
+**ESP-IDF 5.5.6 / LVGL 9.5.0** and Python; the configuration helper supports Windows PowerShell 5.1 and PowerShell 7. Firmware builds use PowerShell 7.
 
 ```powershell
 npm.cmd ci --ignore-scripts
 # New configuration only; existing private files will not be overwritten:
 .\tools\New-LocalConfig.ps1 -BluetoothOnly -BluetoothName WorkLaptop
-.\tools\Start-Bridge.ps1
 ```
 
 The helper asks for an existing native session ID and generates matching private
-configuration. Badge `bluetoothName` must match bridge `bluetooth.hostName`;
-display names may differ from Windows system names.
+configuration. Flash the generic image, connect the computer to the badge setup
+hotspot, open `http://192.168.4.1`, and import `.private/device.config.json` using
+the Bluetooth-only button. Then return the computer to its normal network and
+start the bridge. For LAN use, create configuration with `-NoWiFiPrompt` instead,
+and enter home Wi-Fi on the setup page. Badge `bluetoothName` must match bridge
+`bluetooth.hostName`; display names may differ from Windows system names.
 
-Existing users: update the source and restart the bridge. A working v0.3.0 badge
-**does not need reflashing** just to receive the Windows connection fix.
+Upgrading from v0.3.x requires the new firmware for hotspot setup. Import your
+existing device JSON after flashing; compiled-in old settings do not migrate
+automatically. Keep your private files and verified older images as a fallback.
 
 - [Bluetooth setup/troubleshooting](docs/bluetooth-0.3.0.zh_CN.md)
 - [Card build and flash guide](docs/device-quickstart.md) / [中文](docs/device-quickstart.zh_CN.md)
 - [Windows bridge ZIP guide](docs/windows-bridge-package.md) / [中文](docs/windows-bridge-package.zh_CN.md)
-- [v0.3.1 release notes](docs/releases/v0.3.1.md) / [中文](docs/releases/v0.3.1.zh_CN.md)
+- [v0.4.0 release notes](docs/releases/v0.4.0.md) / [中文](docs/releases/v0.4.0.zh_CN.md)
 
-Downloads contain source, a Windows bridge source package and checksums;
-**no personalized firmware**. Fill your own private configuration and build
-locally. Do not flash a placeholder compile-check image.
+Source and Windows bridge packages contain placeholder templates, never your real
+configuration. New firmware is generic: configure it after flashing. Older
+personalized images remain private; do not upload them.
 
 ## Scope and limitations
 
@@ -108,9 +117,11 @@ Real values belong in ignored `.private/device.config.json` and
 `.private/bridge.config.json`. Wi-Fi accepts up to eight SSID/password pairs;
 Bluetooth-only installations can use an empty array.
 
-Firmware embeds binding keys and any Wi-Fi credentials. Keep firmware, ELF,
-recordings, logs, native session IDs and private configuration out of Git and
-releases. Bluetooth requires authenticated encryption and then HMAC binding.
+Current firmware loads runtime configuration from badge NVS. Your own network and
+computer configuration stays in ignored local JSON and on your badge; it is not
+compiled into the generic image. NVS is not encrypted. Keep older personalized
+firmware, ELF, recordings, logs, native session IDs and private configuration out
+of Git and releases. Bluetooth requires authenticated encryption and then HMAC binding.
 Wi-Fi is explicitly **unencrypted trusted-LAN** transport, not a public Internet
 endpoint. No automatic firewall or port-forward changes are made.
 

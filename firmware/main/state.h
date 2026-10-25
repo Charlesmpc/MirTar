@@ -3,7 +3,7 @@
 #include <stdint.h>
 #define MT_REPLY_MAX 6144
 #define MT_SESSION_MAX 8
-typedef enum { MT_MACHINES, MT_TRANSPORT, MT_CONNECTING, MT_SESSIONS, MT_READING } mt_page_t;
+typedef enum { MT_MACHINES, MT_TRANSPORT, MT_CONNECTING, MT_SESSIONS, MT_READING, MT_SETUP } mt_page_t;
 typedef enum { MT_BLUETOOTH, MT_WIFI } mt_transport_t;
 typedef struct {
     char id[64];

@@ -2,67 +2,76 @@
 
 [简体中文](device-quickstart.zh_CN.md)
 
-**v0.3.1:** Boot now opens the computer list, then the connection-method screen
-with Bluetooth selected by default. See [Bluetooth setup](bluetooth-0.3.0.zh_CN.md)
-and [transport contract](bluetooth-protocol.md). The original M1 Wi-Fi instructions
-below apply when Wi-Fi is selected.
+v0.4.0 uses one firmware image with runtime configuration through the badge hotspot.
+Wi-Fi credentials and computer binding keys are no longer compiled into the image.
+See [hotspot setup](wifi-setup.md). Build/host validation and physical-device acceptance are reported separately.
 
-This is a development build for Windows, a trusted LAN, and pre-existing Codex desktop sessions. Keep the repository private. Real configuration, recordings, receipts, toolchains and firmware remain under ignored local paths. There is no cloud registration or hotspot provisioning.
+## Prepare the computer
 
-## Configuration
-
-Copy the shape in `config/device.example.json` into `.private/device.config.json`, fill it locally, and remove `"template": true`. `wifiNetworks` accepts 0–8 SSID/password pairs (empty for Bluetooth-only), attempted in order. A failed attempt advances to the next entry; after the list is exhausted, attempts repeat. Only 2.4 GHz Wi-Fi is supported by this board. The bridge address must be reachable from the selected network; Wi-Fi connectivity alone does not make a configured computer reachable.
-
-`targets` accepts up to four configured computers. Each target has its own LAN WebSocket address and shared binding secret. `.private/bridge.config.json` must authorize the same `deviceId` and secret. Use a random secret of at least 32 characters. The native Codex session IDs remain owned by Codex; do not create replacement sessions in the bridge. Up to eight existing desktop sessions can be exposed, with display names at most 60 UTF-8 bytes.
-
-The default bridge port is **TCP 28743**. It is configurable: each device target URL must match that computer's bridge `listen.port` and firewall rule. The helper accepts `-Port <number>` for new configuration. After changing a device target port, rebuild and reflash the firmware; restart the bridge after changing its configuration.
-
-Alternatively, run the local helper in PowerShell 7:
-
-```powershell
-.\tools\New-LocalConfig.ps1 -SessionId <native-thread-uuid> -BridgeAddress <computer-LAN-IPv4>
-.\tools\New-LocalConfig.ps1 -AddWiFi
-```
-
-The helper prompts locally for the SSID and hidden password and generates matching binding secrets. Do not paste passwords into chat or commit the files. It refuses to overwrite existing configuration. Edit `skin` to `reading` or `terminal` to select the candidate visual style.
-
-## Start and build
+Use Windows, Node.js 24.13.0+, Microsoft Edge, a signed-in Codex desktop app and a dedicated existing session.
+Run in Windows PowerShell 5.1 or PowerShell 7 (firmware builds below require PowerShell 7):
 
 ```powershell
 npm.cmd ci --ignore-scripts
-npm.cmd run check
-npm.cmd test
-.\tools\Start-Bridge.ps1
-# In another terminal:
-.\tools\Build-Firmware.ps1
+# Bluetooth only, without home Wi-Fi:
+.\tools\New-LocalConfig.ps1 -BluetoothOnly
+# OR LAN use: enter the computer LAN address, leave home Wi-Fi to the setup page:
+.\tools\New-LocalConfig.ps1 -NoWiFiPrompt
 ```
 
-The build helper uses the project-local ESP-IDF 5.5.6 installation under `.private/toolchains`. If the toolchain is not present, follow the official ESP-IDF installation workflow; do not replace an existing global toolchain. `Build-Firmware.ps1 -Config .private/compile.config.json -CompileCheck` is a template compile check only, not a Wi-Fi-ready deliverable.
+Choose one configuration command. It prompts for the native session ID and generates matching private
+`.private/device.config.json` and `.private/bridge.config.json` with a locally random binding key.
+Existing files are never overwritten; an existing personal configuration can be reused.
+The badge supports up to four computers and eight networks. Put all computers into one device file's `targets`.
+Match device ID, binding key and Bluetooth host name with the corresponding bridge.
 
-The bridge binds only to the configured interface, with HMAC challenge-response device binding. M1 explicitly uses unencrypted LAN WebSocket transport (`allowLanPlaintext: true`); audio and reply traffic are not encrypted. No automatic firewall changes or port forwarding are made. If Windows asks about firewall access, scope it to the trusted private network and the intended bridge program; network policy and computer reachability remain environment-specific checks.
+The default port is TCP 28743; the helper accepts `-Port`. For Wi-Fi, the target URL, bridge listener and firewall
+must agree. Allow only a trusted private LAN. No automatic firewall or public exposure changes are made.
+Bluetooth does not need a LAN firewall port. Import updated computer/port settings through the page and restart
+the bridge after editing its configuration; rebuilding firmware is unnecessary.
 
-## Flash and use
+## Build and flash
 
-After a successful configured build, `firmware/build/MirTar-full.bin` is the merged image for offset **0x0**. `firmware/build/mirtar-manifest.json` records its hash and matching ELF hash; `verify_firmware.py` checks each actual flash segment against the merged image. Do not flash a template build, or put the application-only `MirTar.bin` at 0x0.
+Use ESP-IDF 5.5.6. Project scripts use its isolated installation under `.private/toolchains`;
+do not replace existing global tools. The equivalent idf.py workflow is available in the matching SDK environment.
 
-When ready to flash locally, run `tools/Flash-Firmware.ps1 -Port COMx` with the actual device port. It verifies the image hash and refuses template builds. `-WhatIf` previews the write; `-PreserveNvs` uses only the verified segments, subject to a compatible existing partition layout. The build always reconfigures to avoid accidentally reusing an older embedded configuration.
+```powershell
+.\tools\Build-Firmware.ps1
+# Preview only; does not access the device:
+.\tools\Flash-Firmware.ps1 -Port COMx -PreserveNvs -WhatIf
+# After you confirm the serial port and compatible partition layout:
+.\tools\Flash-Firmware.ps1 -Port COMx -PreserveNvs
+```
 
-Flashing replaces the current application. A merged image can reset stored settings; no whole-chip erase is required. Identify the actual device port and use a compatible segmented flash if preserving existing NVS data is required. This guide does not grant an agent permission to flash an arbitrary connected device.
+The default directory is `.private/build-v0.4.0/`. `MirTar-full.bin` is the merged image for offset **0x0**;
+never substitute the app-only `MirTar.bin`. Verification compares every actual flash segment and records hashes/version.
+Use `-BuildDirectory` to select another bundle. Builds do not read private configuration; the old `-Config` switch is rejected.
 
-On this Windows host, genuine compiler queries intermittently return empty or truncated stdout. The build helper applies recorded bounded retries to the private SDK's compiler and linker metadata helpers. Linker metadata must match every member and section name/size in the actual ELF archive and pass the SDK grammar parser; it is never synthesized. Persistent failure remains fatal. No antivirus, endpoint protection, certificate or global shell setting is changed.
+`-PreserveNvs` uses compatible segmented flashing to retain settings and Bluetooth bonds. Merged flashing can clear NVS.
+Do not erase the whole device by default. This guide does not authorize an Agent to flash attached hardware automatically.
+Configuration compiled into v0.3.x does not migrate automatically: import your existing local device JSON after upgrading.
 
-On startup choose a configured computer, then Bluetooth (default) or Wi-Fi. Wi-Fi tries the preset networks only when selected. The card binds using the pre-shared configuration. A single available session opens automatically; otherwise choose a session with UP/DOWN and OK.
+## First setup and connection
 
-- Short OK starts recording; the second short OK ends and submits it. Audio buffered at the bridge is not sent to Codex before commit.
-- Short UP/DOWN reads the content. Long UP/DOWN changes the session while not recording.
-- Long OK cancels an unsubmitted recording and returns to the computer list. It does not cancel an already accepted desktop task.
-- One recording is limited to 30 seconds. Reaching the limit or losing the network cancels an unsubmitted input.
-- An uncertain native submission is not replayed. Check the desktop before repeating the request.
+1. Select Wi-Fi on the badge. With no saved networks, setup starts immediately; failed Wi-Fi connection opens it after 30 seconds.
+2. Scan the Wi-Fi QR or join the displayed `MirTar-Setup-XXXXXX` with its random password. Stay connected despite the no-Internet warning and open `http://192.168.4.1` in your phone browser.
+3. Enter a 2.4 GHz Wi-Fi network and save. Failed connection can be retried on the same page. Hold UP on the Wi-Fi connection/waiting screen to reopen setup when changing networks.
+4. For first use, connect your computer to the same badge hotspot and import `.private/device.config.json` on the page. For Bluetooth only, use the separate computer-import button without entering home Wi-Fi.
+5. Return the computer to its normal network and run `.\tools\Start-Bridge.ps1`. Choose computer and transport on the badge. Bluetooth is the default once computers are configured; enter the displayed six-digit code in Windows on first pairing.
 
-## Current limits
+Networks are stored on the badge; phone edits do not automatically update the computer's JSON.
+If Wi-Fi connects but the computer has not been configured, the hotspot stays open until import or long OK to exit.
+An unavailable bridge does not trigger the Wi-Fi timeout when Wi-Fi itself is connected.
 
-The adapter uses signed-in Codex native WebRTC v3 for voice and the native queue for the target desktop session. It does not add an ASR model, service or API key. Native account access and service limits still apply. Microsoft Edge acts as an isolated local WebRTC media engine, using a dedicated workspace-owned headless profile.
+## Daily controls and limits
 
-Only completed formal Agent replies are displayed. Live tool progress and approval status are not reliably available through this history path; handle approvals on the desktop. Optional TTS/card playback is not implemented in this increment and is advertised as disabled.
+- OK starts recording; OK again submits. Maximum 30 seconds per input.
+- UP/DOWN scroll; hold UP/DOWN to change sessions when not recording.
+- Hold OK to cancel unsubmitted recording and return to computer selection. Accepted computer tasks continue.
+- One session opens automatically; otherwise select with UP/DOWN and OK. Unknown submissions are never replayed.
 
-The 16px font contains 7,540 verified rasterized glyphs covering printable ASCII, GB2312 and fixed UI additions. Unsupported characters, including many emoji/rare Chinese characters, retain visible missing-glyph placeholders; the desktop has the full response. Chinese rendering, microphone levels, physical buttons, audio timing, battery reporting, Wi-Fi failover, memory and actual display layout require device testing.
+Codex owns sessions and provides native voice; no additional ASR service or key is required. Codex still needs normal online access.
+Only completed replies are displayed. TTS, live tool progress, badge approvals, Cursor and other OS implementations remain unavailable.
+Wi-Fi business traffic is trusted-LAN plaintext; BLE uses authenticated encryption and application binding. NVS is not encrypted.
+Keep private configurations, recordings, ELF files, logs and receipts ignored. Public firmware must contain only the generic program.
+Unsupported characters show placeholders; the desktop remains authoritative. Throughput, power use and physical controls need device acceptance.

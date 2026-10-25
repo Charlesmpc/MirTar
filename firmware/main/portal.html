@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MirTar · 连接 Wi-Fi</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,sans-serif;background:#172033;color:#e7edf8}*{box-sizing:border-box}body{max-width:32rem;margin:auto;padding:28px 20px}small,p{color:#acb9d2;line-height:1.7}.brand{letter-spacing:.15em;color:#b7c6fa}h1{font-size:1.8rem}form{background:#243049;padding:22px;border-radius:18px}label{display:block;margin:18px 0 8px}input{width:100%;background:#172033;border:1px solid #60718d;color:inherit;border-radius:9px;padding:13px;font:inherit}button{width:100%;padding:14px;border:0;border-radius:9px;background:#b7c6fa;color:#172033;font:inherit;font-weight:650;margin-top:22px}button:disabled{opacity:.5}details{margin-top:22px}summary{cursor:pointer}#status{white-space:pre-line;min-height:3em}a{color:#b7c6fa}
+</style>
+<body><div class="brand">MIRTAR / LOCAL SETUP</div><h1>连接你的 Wi-Fi</h1>
+<p>信息只保存在这张卡片，不发送到云端。请保持连接卡片热点；提示没有互联网时选择继续连接。</p>
+<form id="setup"><label for="ssid">2.4 GHz Wi-Fi 名称</label><input id="ssid" name="ssid" maxlength="32" autocomplete="off" required>
+<label for="password">Wi-Fi 密码（开放网络可留空）</label><input id="password" name="password" type="password" maxlength="63" autocomplete="new-password">
+<details id="computer"><summary>首次使用：导入电脑配置</summary><p>在 Windows 按仓库指南运行 New-LocalConfig.ps1，生成私有配置。用这台电脑连接卡片热点并打开本页面，选择 .private/device.config.json。已配置电脑时可以跳过。</p>
+<label for="config">电脑生成的 device.config.json</label><input id="config" type="file" accept=".json,application/json"><small>电脑列表以文件为准；多台电脑请放在同一个文件中。已保存网络会保留并合并。绑定信息只传给卡片，不会显示或回传密码。请勿导入 bridge.config.json 或公开占位模板。</small></details>
+<details><summary>更换或清理网络</summary><label><input id="replace" type="checkbox" style="width:auto"> 仅保留本次 Wi-Fi，清除其他已保存网络</label><small>不勾选时，新增或更新同名 Wi-Fi，最多保存 8 组。</small></details>
+<button id="save" type="submit">保存并连接 Wi-Fi</button><button id="bluetooth" type="button" style="background:transparent;color:#b7c6fa;border:1px solid #60718d;margin-top:12px">只导入电脑配置，使用蓝牙</button></form><p id="status" role="status" aria-live="polite">正在连接卡片…</p>
+<p>连接成功后，手机切回原来的网络。卡片会继续连接电脑桥接。长按卡片 OK 可取消配网。</p>
+<script>
+const form=document.getElementById('setup'), statusText=document.getElementById('status'), button=document.getElementById('save'), bluetoothButton=document.getElementById('bluetooth');
+let csrf='',waiting=false,finished=false;
+const messages={ready:'输入 Wi-Fi 后保存。只用蓝牙时，导入电脑配置即可，不必填写 Wi-Fi。',saving:'正在保存配置…',connecting:'配置已保存，正在连接 Wi-Fi…',needs_computer:'Wi-Fi 已连接，请继续导入电脑配置。',failed:'连接失败或超过 30 秒。请检查 Wi-Fi 名称、密码和 2.4 GHz 频段，然后重新提交。',error:'配置未能保存，请重试。',connected:'Wi-Fi 已连接！手机可以切回原来的网络。',bluetooth_ready:'电脑配置已保存！手机或电脑切回原来的网络，在卡片上选择电脑与 Bluetooth。'};
+function show(text){statusText.textContent=text;}
+async function poll(){
+ try{const r=await fetch('/api/status',{cache:'no-store'});if(!r.ok)throw Error();const s=await r.json();csrf=s.csrf;
+ waiting=['saving','connecting','connected','bluetooth_ready'].includes(s.phase);button.disabled=bluetoothButton.disabled=waiting||!csrf;
+ let text=messages[s.phase]||'等待卡片响应…';if(!s.targets){document.getElementById('computer').open=true;text+='\n尚未配置电脑：请导入你在电脑上生成的 device.config.json。';}
+ show(text);if(s.phase==='connected'||s.phase==='bluetooth_ready'){document.getElementById('password').value='';finished=true;button.disabled=bluetoothButton.disabled=true;return;}
+ }catch{show(waiting?'卡片正在切换网络。请查看卡片屏幕；若提示失败，重新连接卡片热点后刷新页面。':'连接不到卡片。请连接屏幕上的热点，再打开 http://192.168.4.1。');button.disabled=bluetoothButton.disabled=true;}
+ if(!finished)setTimeout(poll,1200);
+}
+async function submitConfig(mode){
+ if(waiting||!csrf)return;
+ const ssid=document.getElementById('ssid').value,password=document.getElementById('password').value;
+ const passwordBytes=new TextEncoder().encode(password).length;
+ if(mode==='wifi'&&(!ssid||new TextEncoder().encode(ssid).length>32||passwordBytes>63||(passwordBytes&&passwordBytes<8))){show('名称最多 32 字节；密码应为 8–63 字节，开放网络留空。');return;}
+ const payload={mode,wifi:{ssid,password},replaceNetworks:document.getElementById('replace').checked},file=document.getElementById('config').files[0];
+ if(mode==='bluetooth'&&!file){document.getElementById('computer').open=true;show('请选择电脑生成的 device.config.json。');return;}
+ try{if(file){if(file.size>4096)throw Error('配置文件过大');try{payload.deviceConfig=JSON.parse((await file.text()).replace(/^\uFEFF/,''));}catch{throw Error('配置文件无法读取，请选择 device.config.json。');}}
+ waiting=true;button.disabled=bluetoothButton.disabled=true;show('正在保存配置…');
+ const r=await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json','X-MirTar-Setup':csrf},body:JSON.stringify(payload)});
+ if(!r.ok){const detail=await r.json();throw Error(detail.error==='busy'?'卡片正在连接，请稍候。':'配置无效或网络数量超过 8 组，请检查文件和输入。');}
+ }catch(error){waiting=false;button.disabled=bluetoothButton.disabled=false;show(error.message||'保存失败，请重试。');}
+}
+form.addEventListener('submit',e=>{e.preventDefault();return submitConfig('wifi');});
+bluetoothButton.addEventListener('click',()=>submitConfig('bluetooth'));
+button.disabled=bluetoothButton.disabled=true;poll();
+</script></body></html>

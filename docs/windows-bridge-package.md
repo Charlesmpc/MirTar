@@ -29,7 +29,7 @@ The preview ZIP contains the Windows bridge's Node.js/TypeScript sources, tests,
 
 ## Device and privacy
 
-The badge uses Bluetooth LE by default, or trusted-LAN Wi-Fi; Codex uses its normal online service. Firmware embeds Wi-Fi credentials and binding keys at build time, so release downloads contain no configured `.bin`, `.elf`, device configuration or private bridge configuration. Build personalized firmware locally from the full source after filling `.private/device.config.json`; do not upload the resulting binary. The [card quickstart](device-quickstart.md) describes local builds and USB flashing.
+The badge uses Bluetooth LE by default or trusted-LAN Wi-Fi. v0.4.0 configures networks and computers through the badge hotspot page; firmware no longer embeds private credentials. See [setup](wifi-setup.md) and the [card guide](device-quickstart.md). Keep older personalized firmware, real configuration and ELF files private.
 
 The preview displays completed replies. TTS and reliable tool-progress/approval reporting are unavailable. See the [release notes](releases/v0.3.1.md) for validation limits.
 

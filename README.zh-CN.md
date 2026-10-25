@@ -2,7 +2,7 @@
 
 **把电脑上的编程 Agent，带到手里。**
 
-[English](README.md) · [版本下载](https://github.com/Charlesmpc/MirTar/releases) · [使用说明](docs/bluetooth-0.3.0.zh_CN.md)
+[English](README.md) · [版本下载](https://github.com/Charlesmpc/MirTar/releases) · [使用说明](docs/device-quickstart.zh_CN.md)
 
 MirTar 把 FoloToy AI Passport 卡片变成**电脑上编程 Agent 的随身控制器和回复屏幕**。
 不用戴耳机或一直凑到电脑麦克风前：按 OK 说话，再按 OK 发送，在卡片上阅读回复；
@@ -22,8 +22,12 @@ MirTar 把 FoloToy AI Passport 卡片变成**电脑上编程 Agent 的随身控�
 这不等于离线运行 Agent。BLE 使用认证加密和应用绑定；Wi-Fi 当前仍为明文，只适合可信局域网。
 
 **OS 适配层独立于 Agent 和设备协议**：目前实现 Windows 桥接，后续计划实现 macOS、Linux。
-当前 Agent 适配器是 Codex。**v0.3.1 同时包含局域网 Wi-Fi 和 Bluetooth**，默认选中 Bluetooth，
-并修复了蓝牙服务发现和已配对重连问题。用户已报告真机语音测试通过；新版演示视频稍后补充。
+当前 Agent 适配器是 Codex。**v0.4.0 增加运行时配网**：选择 Wi-Fi 后，无网络配置立即打开卡片热点，
+有配置但 30 秒未连接也自动进入；扫码连接后访问 `http://192.168.4.1`，保存 Wi-Fi 并导入自己的电脑配置。
+固件不再嵌入私人密码或绑定密钥。只用蓝牙时也可导入电脑配置，不必填写家庭 Wi-Fi。
+详见[热点配网指南](docs/wifi-setup.zh_CN.md)。
+
+本次配网为测试版；编译与主机检查不代表真机验收。
 
 ## 流程与操作
 
@@ -41,26 +45,27 @@ MirTar 把 FoloToy AI Passport 卡片变成**电脑上编程 Agent 的随身控�
 
 需要 AI Passport、支持 BLE 的 Windows、Node.js **24.13.0+**、Microsoft Edge、
 已登录的 Codex 桌面应用及其可执行程序。编译固件使用 **ESP-IDF 5.5.6 / LVGL 9.5.0**；
-配置和编译助手使用 PowerShell 7。
+配置助手支持 Windows PowerShell 5.1 和 PowerShell 7；编译助手使用 PowerShell 7。
 
 ```powershell
 npm.cmd ci --ignore-scripts
 # 仅新建配置，不覆盖已有文件：
 .\tools\New-LocalConfig.ps1 -BluetoothOnly -BluetoothName WorkLaptop
-.\tools\Start-Bridge.ps1
 ```
 
-助手在本机询问原生会话 ID，生成匹配的私有配置。卡片 `bluetoothName` 必须与桥接
-`bluetooth.hostName` 一致。已有用户更新源码后重启桥接即可，正常工作的 v0.3.0 卡片
-不需要为了本次 Windows 连接修复重新刷机。
+助手在本机询问原生会话 ID，生成匹配的私有配置。刷入通用固件后，用电脑连接卡片热点，
+打开 `http://192.168.4.1`，导入 `.private/device.config.json`，选择只使用蓝牙；
+电脑切回原网络后再启动桥接。若使用局域网，将配置命令改为 `-NoWiFiPrompt`，在配网页面填写家庭 Wi-Fi。
+卡片 `bluetoothName` 必须与桥接 `bluetooth.hostName` 一致。
+升级 v0.3.x 时需重新刷入新固件并导入旧配置；旧固件里的编译配置不会自动迁移。保留原文件与已验证镜像作回退。
 
 - [蓝牙配对、配置和排错](docs/bluetooth-0.3.0.zh_CN.md)
 - [固件编译与刷入](docs/device-quickstart.zh_CN.md)
 - [Windows 桥接下载包](docs/windows-bridge-package.zh_CN.md)
-- [v0.3.1 发布说明](docs/releases/v0.3.1.zh_CN.md)
+- [v0.4.0 发布说明](docs/releases/v0.4.0.zh_CN.md)
 
-Release 提供完整源码、Windows 桥接源码包和校验文件，**不提供含真实配置的固件**。
-请填写自己的配置后本地编译；占位模板的编译产物不能直接用于真实连接。
+源码和桥接包只含占位模板。新版固件是通用程序，刷入后在卡片引导中配置；
+旧版含私人配置的镜像仍须留在本机，不能上传。
 
 ## 当前边界
 
@@ -74,8 +79,8 @@ Release 提供完整源码、Windows 桥接源码包和校验文件，**不提�
 ## 配置与保密
 
 `config/` 只放占位模板，真实配置只放 `.private/`。Wi-Fi 最多八组 SSID/password，
-只用蓝牙时可以是空数组。固件会嵌入绑定密钥和填写的 Wi-Fi 凭据，配置、固件、ELF、
-录音、日志和原生会话 ID 都不要提交或上传。
+只用蓝牙时可以是空数组。新版配置写入卡片 NVS，固件不再编入私人凭据；NVS 当前尚未加密。
+私人配置、旧版个性化固件、ELF、录音、日志和原生会话 ID 都不要提交或上传。
 蓝牙使用认证加密，随后再校验 HMAC；Wi-Fi 是显式开启的可信局域网明文连接，不应暴露到公网。
 程序不会自动修改防火墙或做端口映射。
 

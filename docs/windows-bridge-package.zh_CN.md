@@ -29,7 +29,7 @@
 
 ## 卡片与保密
 
-卡片默认通过 Bluetooth LE 连接，也可选择可信局域网 Wi-Fi；Codex 仍使用正常的在线服务。固件会在编译时嵌入 Wi-Fi 密码和绑定密钥，因此 Release 下载包不含实际配置的 `.bin`、`.elf`、设备配置或私有桥接配置。请在完整源码中填写 `.private/device.config.json` 后，本机编译个人固件，不上传生成的二进制。[卡片使用说明](device-quickstart.zh_CN.md)包含本机编译和 USB 刷机步骤。
+卡片默认通过 Bluetooth LE，也可用可信局域网 Wi-Fi。v0.4.0 使用运行时配置：在卡片热点网页导入自己的设备 JSON，填写网络并保存到卡片，固件不再嵌入私人凭据。详见[热点配网](wifi-setup.zh_CN.md)与[卡片指南](device-quickstart.zh_CN.md)。旧版个性化固件、真实配置和 ELF 仍不得上传。
 
 预览版显示已完成的回复，尚不支持 TTS 或可靠的工具实时进度／审批状态。验证边界见[发布说明](releases/v0.3.1.zh_CN.md)。
 

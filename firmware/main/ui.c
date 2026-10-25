@@ -2,8 +2,10 @@
 #include "bsp_display.h"
 #include "lvgl.h"
 #include <stdio.h>
+#include <string.h>
+#include "esp_app_desc.h"
 LV_FONT_DECLARE(mirtar_font_16);
-static lv_obj_t *top, *battery_text, *header, *viewport, *text, *footer;
+static lv_obj_t *top, *battery_text, *header, *viewport, *text, *footer, *setup_qr;
 static lv_font_t font;
 static uint32_t paper, ink, muted, accent;
 void mt_ui_init(bool reading_skin) {
@@ -48,11 +50,13 @@ void mt_ui_render(const mt_state_t *s, const char *status, const char *body, int
     if (battery >= 0) snprintf(info, sizeof(info), "%d%%", battery);
     else snprintf(info, sizeof(info), "--");
     lv_label_set_text(battery_text, info);
-    lv_label_set_text(top, s->bound ? s->target_name : s->page == MT_MACHINES ? "MirTar 0.3.1" : s->transport == MT_BLUETOOTH ? "Bluetooth" : s->wifi ? "Wi-Fi" : "Offline");
+    snprintf(info, sizeof(info), "MirTar %s", esp_app_get_description()->version);
+    lv_label_set_text(top, s->bound ? s->target_name : s->page == MT_MACHINES ? info : s->page == MT_SETUP ? "Wi-Fi Setup" : s->transport == MT_BLUETOOTH ? "Bluetooth" : s->wifi ? "Wi-Fi" : "Offline");
+    if (s->page != MT_SETUP) { if (setup_qr) lv_obj_add_flag(setup_qr, LV_OBJ_FLAG_HIDDEN); lv_obj_set_pos(text, 4, 4); }
     if (s->page == MT_READING && s->selected < s->session_count) {
         snprintf(info, sizeof(info), "Codex / %s", s->sessions[s->selected].name); lv_label_set_text(header, info);
     }
-    else lv_label_set_text(header, "MirTar / Codex");
+    else lv_label_set_text(header, s->page == MT_SETUP ? "扫码连接卡片热点" : "MirTar / Codex");
     if (body) { lv_label_set_text(text, body); lv_obj_scroll_to_y(viewport, 0, LV_ANIM_OFF); }
     lv_label_set_text(footer, status);
 }
@@ -62,3 +66,26 @@ void mt_ui_recording(unsigned seconds, unsigned level) {
     lv_label_set_text(text, body);
 }
 void mt_ui_scroll(int direction) { lv_obj_scroll_by(viewport, 0, direction > 0 ? -96 : 96, LV_ANIM_OFF); }
+void mt_ui_skin(bool reading_skin) {
+    paper=reading_skin?0x172033:0x122021; ink=reading_skin?0xe7edf8:0xeef4ec;
+    muted=reading_skin?0xa5b2cd:0xa0b6ad; accent=reading_skin?0xb7c6fa:0xa8d9b0;
+    lv_obj_set_style_bg_color(lv_screen_active(),lv_color_hex(paper),0);
+    lv_obj_set_style_text_color(lv_screen_active(),lv_color_hex(ink),0);
+    lv_obj_set_style_text_color(text,lv_color_hex(ink),0);
+    lv_obj_set_style_text_color(top,lv_color_hex(muted),0); lv_obj_set_style_text_color(battery_text,lv_color_hex(muted),0);
+    lv_obj_set_style_text_color(footer,lv_color_hex(accent),0);
+    lv_obj_set_style_bg_color(viewport,lv_color_hex(0x243049),0);
+    lv_obj_set_style_bg_opa(viewport,reading_skin?LV_OPA_COVER:LV_OPA_TRANSP,0);
+    lv_obj_set_style_radius(viewport,reading_skin?8:0,0);
+}
+void mt_ui_setup(const char *ssid, const char *password) {
+    if (!setup_qr) setup_qr = lv_qrcode_create(viewport);
+    if (!setup_qr) return;
+    lv_qrcode_set_size(setup_qr, 128); lv_obj_set_pos(setup_qr, 44, 2);
+    lv_qrcode_set_dark_color(setup_qr, lv_color_hex(0x172033)); lv_qrcode_set_light_color(setup_qr, lv_color_hex(0xffffff));
+    char payload[160]; snprintf(payload, sizeof(payload), "WIFI:T:WPA;S:%s;P:%s;;", ssid, password);
+    lv_qrcode_update(setup_qr, payload, strlen(payload)); lv_obj_remove_flag(setup_qr, LV_OBJ_FLAG_HIDDEN);
+    char body[180]; snprintf(body, sizeof(body), "%s\n密码 %s\nhttp://192.168.4.1", ssid, password);
+    lv_obj_set_pos(text, 4, 138); lv_label_set_text(text, body); lv_obj_scroll_to_y(viewport, 0, LV_ANIM_OFF);
+    lv_label_set_text(footer, "长按 OK 退出配网");
+}
