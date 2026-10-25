@@ -1,0 +1,4 @@
+- The home screen now offers Server list, Bluetooth Add server and an explicitly opened Add config-file flow. Public firmware includes no creator hosts or credentials.
+- Each computer owns its optional Wi-Fi settings. Import a complete configuration file through the card hotspot; connection failures no longer open automatic Wi-Fi setup.
+- Bluetooth pairing profiles are stored separately for each computer. After one minute without binding, a confirmed reset clears only the selected computer's pairing while preserving other computers and Wi-Fi.
+- The Windows bridge improves notification subscription retries, initial-handshake buffering and isolation of callbacks from obsolete connections.

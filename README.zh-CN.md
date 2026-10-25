@@ -2,7 +2,11 @@
 
 **把电脑上的编程 Agent，带到手里。**
 
-[English](README.md) · [版本下载](https://github.com/Charlesmpc/MirTar/releases) · [使用说明](docs/bluetooth-0.3.0.zh_CN.md)
+[English](README.md) · [版本下载](https://github.com/Charlesmpc/MirTar/releases) · [使用说明](docs/server-onboarding.zh_CN.md)
+
+<p align="center"><img src="docs/images/mirtar-cover.png" width="440" alt="MirTar 概念示意图：手持语音界面与笔记本中的同一会话相连"></p>
+
+*概念示意图，并非卡片实拍或界面截图。*
 
 MirTar 把 FoloToy AI Passport 卡片变成**电脑上编程 Agent 的随身控制器和回复屏幕**。
 不用戴耳机或一直凑到电脑麦克风前：按 OK 说话，再按 OK 发送，在卡片上阅读回复；

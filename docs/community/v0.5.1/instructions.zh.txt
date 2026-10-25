@@ -1,0 +1,5 @@
+1. Windows 安装 Node.js 24.13+、Edge 并登录 Codex，建立专用会话。解压同版桥接包，在该目录运行 npm.cmd ci --ignore-scripts；首次运行 .\tools\New-LocalConfig.ps1 -BluetoothOnly，按提示填现有会话 ID 和 Codex 路径。
+2. 卡片选 Add server，电脑运行 .\tools\Add-Server.ps1。在 Windows 输入卡片的六位码，再在卡片按 OK 确认主机名称。
+3. 电脑运行 .\tools\Start-Bridge.ps1；卡片从 Server list 选主机和 Bluetooth，连接会话。默认蓝牙无需配网，下次可直接连接。
+4. OK 开始说话，再按 OK 发送；上下翻阅回复，长按上下切会话，长按 OK 回首页。
+5. 可选 Wi-Fi：按仓库模板准备 v2 配置文件，填写该主机的 2.4 GHz 网络、密码、电脑地址和桥接绑定信息。卡片选 Add config-file；手机或电脑连接屏幕所示热点及密码，保持无互联网连接，浏览器打开 http://192.168.4.1，选择文件并点“上传并保存配置”。看到“配置已保存”并回首页后，电脑恢复正常网络、启动桥接，卡片选该主机的 Wi-Fi。失败重传；换网修改文件后重新导入。

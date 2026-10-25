@@ -2,7 +2,11 @@
 
 **Your coding agent, in your hand.**
 
-[简体中文](README.zh-CN.md) · [Releases](https://github.com/Charlesmpc/MirTar/releases) · [Setup](docs/bluetooth-0.3.0.zh_CN.md)
+[简体中文](README.zh-CN.md) · [Releases](https://github.com/Charlesmpc/MirTar/releases) · [Setup](docs/server-onboarding.md)
+
+<p align="center"><img src="docs/images/mirtar-cover.png" width="440" alt="MirTar concept illustration: a voice conversation connects a handheld interface to a laptop"></p>
+
+*Concept illustration; not a photograph or screenshot of the badge.*
 
 MirTar turns a FoloToy AI Passport badge into a handheld controller and reply
 screen for the coding agent on your computer. Sit back, press OK, speak, then
