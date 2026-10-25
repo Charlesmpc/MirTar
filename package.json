@@ -1,0 +1,20 @@
+{
+  "name": "mirtar",
+  "version": "0.3.1",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24.13.0" },
+  "scripts": {
+    "security:check": "node tools/check-private-files.mjs",
+    "audit:privacy": "node tools/audit-repository.mjs",
+    "test:audit": "node --test tools/audit-repository.test.mjs",
+    "test:security": "node --test tools/check-private-files.test.mjs",
+    "hooks:install": "git config --local core.hooksPath .githooks",
+    "start": "node bridge/src/main.ts",
+    "check": "tsc --noEmit",
+    "test": "node --test bridge/tests/*.test.ts",
+    "device": "node tools/device-simulator.ts"
+  },
+  "dependencies": { "ws": "8.18.3" },
+  "devDependencies": { "typescript": "5.9.3", "@types/node": "24.10.1", "@types/ws": "8.18.1" }
+}

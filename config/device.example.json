@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "template": true,
+  "deviceId": "mirtar-card-1",
+  "skin": "reading",
+  "allowLanPlaintext": true,
+  "wifiNetworks": [
+    { "ssid": "HOME_2G", "password": "FILL_LOCALLY" },
+    { "ssid": "OFFICE_2G", "password": "FILL_LOCALLY" }
+  ],
+  "targets": [
+    {
+      "name": "Windows",
+      "bluetoothName": "Windows",
+      "url": "ws://192.168.1.10:28743/device",
+      "secret": "REPLACE_WITH_A_LOCALLY_GENERATED_RANDOM_SECRET_64_HEX"
+    }
+  ]
+}

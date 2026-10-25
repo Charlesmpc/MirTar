@@ -1,0 +1,35 @@
+# Private configuration and credentials
+.env
+.env.*
+!.env.example
+device.config.json
+bridge.config.json
+device.*.config.json
+bridge.*.config.json
+*.local.json
+.private/
+secrets/
+*.key
+*.pem
+# This directory is for placeholder templates only.
+/config/*
+!/config/device.example.json
+!/config/bridge.example.json
+
+# Build outputs, firmware, and logs
+build/
+dist/
+*.bin
+*.elf
+*.map
+*.log
+
+# Local development files
+.venv/
+node_modules/
+__pycache__/
+.DS_Store
+firmware/managed_components/
+firmware/sdkconfig
+firmware/sdkconfig.old
+Thumbs.db

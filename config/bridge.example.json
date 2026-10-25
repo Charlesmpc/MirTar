@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "bluetooth": { "enabled": true, "hostName": "Windows" },
+  "listen": { "host": "192.168.1.10", "port": 28743, "allowLanPlaintext": true },
+  "devices": [{ "id": "mirtar-card-1", "secret": "SAME_LOCAL_SECRET_AS_DEVICE_TARGET" }],
+  "codex": {
+    "bin": "codex",
+    "edgePath": "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+    "sessions": [{ "id": "EXISTING_DESKTOP_THREAD_UUID", "name": "mirtar #1" }]
+  }
+}
