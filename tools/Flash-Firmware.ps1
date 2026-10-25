@@ -10,9 +10,10 @@ function Get-VerifiedSha256([string]$Path) {
     finally { $sha.Dispose(); $stream.Dispose() }
 }
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-$build = if ($BuildDirectory) { [IO.Path]::GetFullPath($BuildDirectory) } else { Join-Path $repoRoot 'firmware\build' }
+$buildVersion = (Get-Content -LiteralPath (Join-Path $repoRoot 'package.json') -Raw | ConvertFrom-Json).version
+$build = if ($BuildDirectory) { [IO.Path]::GetFullPath($BuildDirectory) } else { Join-Path $repoRoot ('.private\build-v' + $buildVersion) }
 $manifest = Get-Content -LiteralPath (Join-Path $build 'mirtar-manifest.json') -Raw | ConvertFrom-Json
-if ($manifest.templateConfiguration -ne $false) { throw 'This is a template compile-check build. Fill private configuration and build again before flashing.' }
+if ($manifest.templateConfiguration -ne $false) { throw 'This is a legacy template compile-check build. Use a verified runtime-provisioned image or the matching legacy configured build.' }
 $full = Join-Path $build 'MirTar-full.bin'
 if ((Get-VerifiedSha256 $full) -ne $manifest.sha256) { throw 'Firmware hash does not match the verified build' }
 if ($manifest.chip -ne 'esp32c3' -or $manifest.sdk -ne '5.5.6') { throw 'Unexpected firmware target' }

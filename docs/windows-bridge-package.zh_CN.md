@@ -1,5 +1,7 @@
 # Windows 桥接包使用说明
 
+> 当前开发版的主机、配置与引导逻辑见[新设计与步骤](server-onboarding.zh_CN.md)。下文保留为旧版历史说明，配置结构和启动步骤不再作为当前指引。
+
 [English](windows-bridge-package.md)
 
 预览版 ZIP 包含 Windows 桥接的 Node.js/TypeScript 源码、测试、启动助手和占位配置模板，依赖在本机安装。包内不含 Node.js、Codex、Microsoft Edge 或已配置的卡片固件。编译固件请使用完整源码包或仓库。

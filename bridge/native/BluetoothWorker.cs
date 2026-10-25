@@ -175,7 +175,7 @@ public static class BluetoothWorker {
         }
         stopping = true;
     }
-    static async Task Run(string hostName) {
+    static async Task Run(string hostName, bool pairing) {
         expectedName = "MirTar-" + hostName;
         var radio = await Await(BluetoothAdapter.GetDefaultAsync());
         if (radio == null || !radio.IsCentralRoleSupported) { Status("bluetooth_unavailable"); return; }
@@ -183,7 +183,9 @@ public static class BluetoothWorker {
             var watcher = new BluetoothLEAdvertisementWatcher { ScanningMode = BluetoothLEScanningMode.Active };
             DateTime retryAt = DateTime.MinValue;
             watcher.Received += async (s, e) => {
-                if (e.Advertisement.LocalName != expectedName || DateTime.UtcNow < retryAt || device != null) return;
+                string name = e.Advertisement.LocalName;
+                bool matches = pairing ? name != null && name.StartsWith("MirTar-Add-") && name.Length == 17 : name == expectedName;
+                if (!matches || DateTime.UtcNow < retryAt || device != null) return;
                 retryAt = DateTime.UtcNow.AddSeconds(8);
                 await Connect(e.BluetoothAddress);
             };
@@ -193,7 +195,7 @@ public static class BluetoothWorker {
         }
     }
     [STAThread] public static int Main(string[] args) {
-        try { if (args.Length != 1) return 2; Run(args[0]).GetAwaiter().GetResult(); return 0; }
+        try { if (args.Length < 1 || args.Length > 2 || args.Length == 2 && args[1] != "--pair") return 2; Run(args[0], args.Length == 2).GetAwaiter().GetResult(); return 0; }
         catch { Status("bluetooth_unavailable"); return 1; }
     }
 }

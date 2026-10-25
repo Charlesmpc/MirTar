@@ -22,8 +22,10 @@ MirTar 把 FoloToy AI Passport 卡片变成**电脑上编程 Agent 的随身控�
 这不等于离线运行 Agent。BLE 使用认证加密和应用绑定；Wi-Fi 当前仍为明文，只适合可信局域网。
 
 **OS 适配层独立于 Agent 和设备协议**：目前实现 Windows 桥接，后续计划实现 macOS、Linux。
-当前 Agent 适配器是 Codex。**v0.3.1 同时包含局域网 Wi-Fi 和 Bluetooth**，默认选中 Bluetooth，
-并修复了蓝牙服务发现和已配对重连问题。用户已报告真机语音测试通过；新版演示视频稍后补充。
+当前 Agent 适配器是 Codex。**当前分支为 v0.5.0-dev.1 开发版**，从 v0.3.1 重新开发。
+开机三个入口：Server list、Add server、Add config-file。蓝牙添加交换主机名称和绑定信息；
+文件导入只在主动开启卡片热点后进行。每台主机保存自己的可选 Wi-Fi，默认连接方式仍是蓝牙。
+新流程尚待真机验收，旧版用户语音测试通过不代表本版验收。
 
 ## 流程与操作
 
@@ -32,35 +34,37 @@ MirTar 把 FoloToy AI Passport 卡片变成**电脑上编程 Agent 的随身控�
 桥接不另接 ASR 服务，也不要求额外 ASR API Key。会话、上下文和执行由 Codex 管理。
 蓝牙模式不需要卡片和笔记本共享 Wi-Fi；电脑访问 Codex 本身仍可能需要互联网及原生语音额度。
 
-1. 开机选电脑，OK 进入连接方式，默认选中 Bluetooth。
-2. 首次连接在 Windows 输入卡片上的六位码，后续复用配对记录。
-3. 进入已有会话；只有一个时自动打开。
-4. OK 开始录音，再次 OK 提交；上下翻阅，长按上下切会话，长按 OK 返回电脑选择。
+1. Server list 查看已保存主机；Add server 只通过蓝牙添加。
+2. Add config-file 开启卡片热点，扫码或手动连接后访问 `http://192.168.4.1`，上传准备好的 v2 设备 JSON。
+3. 选择已保存主机，默认 Bluetooth；Wi-Fi 仅使用该主机自己的网络和电脑地址。
+4. OK 开始录音，再次 OK 提交；上下翻阅，长按上下切会话，长按 OK 回首页。
 
 ## 开始使用
 
-需要 AI Passport、支持 BLE 的 Windows、Node.js **24.13.0+**、Microsoft Edge、
-已登录的 Codex 桌面应用及其可执行程序。编译固件使用 **ESP-IDF 5.5.6 / LVGL 9.5.0**；
-配置和编译助手使用 PowerShell 7。
+需要 AI Passport、BLE Windows、Node.js **24.13.0+**、Edge、已登录的 Codex 桌面会话。
+配置工具支持 Windows PowerShell 5.1／PowerShell 7；编译使用 PowerShell 7、**ESP-IDF 5.5.6 / LVGL 9.5.0**。
 
 ```powershell
 npm.cmd ci --ignore-scripts
-# 仅新建配置，不覆盖已有文件：
-.\tools\New-LocalConfig.ps1 -BluetoothOnly -BluetoothName WorkLaptop
+# 只在尚无私有配置时运行，原有文件不覆盖：
+.\tools\New-LocalConfig.ps1 -BluetoothOnly
+# 卡片选 Add server，再在目标电脑运行：
+.\tools\Add-Server.ps1
+# 完成 Windows 配对码输入、卡片 OK 确认，再启动／重启普通桥接：
 .\tools\Start-Bridge.ps1
 ```
 
-助手在本机询问原生会话 ID，生成匹配的私有配置。卡片 `bluetoothName` 必须与桥接
-`bluetooth.hostName` 一致。已有用户更新源码后重启桥接即可，正常工作的 v0.3.0 卡片
-不需要为了本次 Windows 连接修复重新刷机。
+主机显示名称默认电脑名，可在添加时编辑或用 `-Name` 指定；固定主机 ID 与显示名分离。
+卡片不搜索或列出附近电脑，Windows 内部发现处于蓝牙添加窗口的卡片。
+另一入口 Add config-file 支持上传文件，按 ID 新增／更新，保留其他主机。
+旧 v1 配置先运行 `Convert-DeviceConfig.ps1`，得到独立的 `.private/device.v2.config.json`，原文件不动；
+蓝牙添加后的实际绑定信息可用 `Export-DeviceConfig.ps1` 导出。旧编译配置和 v0.4.0 存储不会自动迁移。
 
-- [蓝牙配对、配置和排错](docs/bluetooth-0.3.0.zh_CN.md)
+- [主机添加、文件格式与完整步骤](docs/server-onboarding.zh_CN.md)
 - [固件编译与刷入](docs/device-quickstart.zh_CN.md)
-- [Windows 桥接下载包](docs/windows-bridge-package.zh_CN.md)
-- [v0.3.1 发布说明](docs/releases/v0.3.1.zh_CN.md)
+- [验证记录](docs/validation/server-onboarding-0.5.0.md)
 
-Release 提供完整源码、Windows 桥接源码包和校验文件，**不提供含真实配置的固件**。
-请填写自己的配置后本地编译；占位模板的编译产物不能直接用于真实连接。
+本开发版尚未发布或投稿；可本地构建不含私人凭据的通用镜像，保留原已验证镜像作回退。
 
 ## 当前边界
 
@@ -73,9 +77,10 @@ Release 提供完整源码、Windows 桥接源码包和校验文件，**不提�
 
 ## 配置与保密
 
-`config/` 只放占位模板，真实配置只放 `.private/`。Wi-Fi 最多八组 SSID/password，
-只用蓝牙时可以是空数组。固件会嵌入绑定密钥和填写的 Wi-Fi 凭据，配置、固件、ELF、
-录音、日志和原生会话 ID 都不要提交或上传。
+`config/` 只放占位模板，真实配置和备份只放忽略的 `.private/`。
+v2 使用 `servers[]`，每台主机有自己的 `wifi: {ssid, password, url}`；只用蓝牙时省略或置空。
+最多四台主机，没有全局 Wi-Fi 列表。固件不编入实际凭据，运行时保存到卡片 NVS，目前尚未加密。
+私人配置、备份、旧版个性化镜像、ELF、录音、日志和原生会话 ID 都不能上传 Git 或社区。
 蓝牙使用认证加密，随后再校验 HMAC；Wi-Fi 是显式开启的可信局域网明文连接，不应暴露到公网。
 程序不会自动修改防火墙或做端口映射。
 

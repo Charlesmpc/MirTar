@@ -23,10 +23,11 @@
 #include "bsp_battery.h"
 #include "state.h"
 #include "ui.h"
-#include "device_config.h"
+#include "runtime_config.h"
+#include "wifi_portal.h"
 #include "ble_transport.h"
 
-typedef enum { EV_KEY, EV_WIFI_ON, EV_WIFI_OFF, EV_WS_ON, EV_WS_OFF, EV_JSON, EV_AUDIO_DONE, EV_BLE_PIN } event_kind_t;
+typedef enum { EV_KEY, EV_WIFI_ON, EV_WIFI_OFF, EV_WS_ON, EV_WS_OFF, EV_JSON, EV_AUDIO_DONE, EV_BLE_PIN, EV_CONFIG } event_kind_t;
 typedef struct { event_kind_t kind; int key, action; uint32_t generation; char *json; } event_t;
 typedef struct { const char *name, *url, *secret, *bluetooth_name; } target_t;
 static QueueHandle_t events;
@@ -36,7 +37,7 @@ static esp_websocket_client_handle_t websocket;
 static mt_state_t state;
 static target_t targets[4];
 static int target_count, target_index;
-static wifi_config_t wifi_networks[8];
+static wifi_config_t wifi_networks[1];
 static int wifi_count, wifi_index;
 static int64_t wifi_retry_at, wifi_attempt_deadline;
 static bool wifi_attempt_active;
@@ -54,6 +55,16 @@ static bool manual_machine_selection, follow_reply = true;
 static char pending_reply[MT_REPLY_MAX + 1];
 static uint32_t recording_id;
 static char submitted_session[64];
+static cJSON *device_config, *pair_candidate;
+static int home_index;
+static char *pending_config;
+static int64_t config_apply_at, portal_close_at, pair_deadline, pair_close_at, wifi_deadline;
+static char pair_nonce[33], pair_server_id[41];
+static bool pair_finished;
+static void show_home(void);
+static void read_settings(void);
+static void enter_pairing(void);
+static void enter_config_upload(void);
 
 static const char *str(cJSON *o, const char *key) {
     cJSON *v = cJSON_GetObjectItemCaseSensitive(o, key);
@@ -95,7 +106,15 @@ static void show_sessions(void) {
     }
     state.page = MT_SESSIONS; status("上下选择  OK 进入"); render(body);
 }
+static void show_home(void) {
+    char body[300];
+    if(target_count)snprintf(body,sizeof(body),"%s Server list (%d)\n\n%s Add server\n\n%s Add config-file",
+        home_index==0?">":" ",target_count,home_index==1?">":" ",home_index==2?">":" ");
+    else snprintf(body,sizeof(body),"%s Add server\n\n%s Add config-file",home_index==1?">":" ",home_index==2?">":" ");
+    state.page=MT_HOME;status("上下选择  OK 进入");render(body);
+}
 static void show_machines(void) {
+    if(!target_count){home_index=1;show_home();return;}
     char body[512] = "选择电脑\n\n";
     for (int i = 0; i < target_count; i++) {
         size_t offset = strlen(body);
@@ -152,7 +171,6 @@ static void ble_event(mt_ble_event_t event, uint32_t current, const char *json, 
 }
 static void wifi_event(void *arg, esp_event_base_t base, int32_t id, void *data);
 static bool start_wifi(void) {
-    if (!wifi_count) return false;
     if (!wifi_initialized) {
         wifi_netif = esp_netif_create_default_wifi_sta();
         if (!wifi_netif) return false;
@@ -168,6 +186,10 @@ static bool start_wifi(void) {
 }
 static bool disconnect_target(void) {
     stop_audio(); if (atomic_load(&audio_busy)) return false;
+    mt_portal_stop();
+    free(pending_config);pending_config=NULL;config_apply_at=portal_close_at=wifi_deadline=0;
+    cJSON_Delete(pair_candidate);pair_candidate=NULL;pair_deadline=pair_close_at=0;pair_finished=false;
+    memset(pair_nonce,0,sizeof(pair_nonce));
     generation++;
     mt_ble_stop();
     if (websocket) { esp_websocket_client_stop(websocket); esp_websocket_client_destroy(websocket); websocket = NULL; }
@@ -182,7 +204,42 @@ static bool disconnect_target(void) {
     mt_disconnect(&state);
     return true;
 }
+static bool portal_submit(char *json) {
+    event_t event={.kind=EV_CONFIG,.generation=generation,.json=json};
+    return xQueueSend(events,&event,0)==pdTRUE;
+}
+static void read_settings(void) {
+    device_id=str(device_config,"deviceId");target_count=target_index=0;
+    memset(targets,0,sizeof(targets));cJSON *item;
+    cJSON_ArrayForEach(item,cJSON_GetObjectItem(device_config,"servers")) {
+        if(target_count>=4)break;
+        targets[target_count++]=(target_t){.name=str(item,"name"),.secret=str(item,"secret"),
+            .bluetooth_name=str(item,"bluetoothName"),.url=str(cJSON_GetObjectItem(item,"wifi"),"url")};
+    }
+    if(bsp_lvgl_lock(200)){mt_ui_skin(!strcmp(str(device_config,"skin"),"reading"));bsp_lvgl_unlock();}
+}
+static void enter_config_upload(void) {
+    if(!disconnect_target())return;
+    manual_machine_selection=true;state.transport=MT_WIFI;state.page=MT_SETUP;
+    if(!start_wifi()||!mt_portal_start(device_config,portal_submit)) {
+        status("配置热点启动失败");render("长按 OK 返回后重试");return;
+    }
+    status("连接热点后上传配置文件");render(NULL);
+    if(bsp_lvgl_lock(300)){mt_ui_setup(mt_portal_ssid(),mt_portal_password());bsp_lvgl_unlock();}
+}
+static void enter_pairing(void) {
+    if(target_count>=4){status("主机已满，请用配置更新");render(NULL);return;}
+    if(!disconnect_target())return;
+    manual_machine_selection=false;state.transport=MT_BLUETOOTH;state.page=MT_PAIRING;
+    pair_deadline=esp_timer_get_time()+120000000;
+    char name[21];snprintf(name,sizeof(name),"Add-%06lX",(unsigned long)(esp_random()&0xffffff));
+    if(!mt_ble_start(name,generation,ble_event)){status("蓝牙启动失败");render("长按 OK 返回");return;}
+    status("等待电脑添加  仅蓝牙");
+    render("在电脑运行\nAdd-Server.ps1\n\n在 Windows 输入卡片配对码\n\n长按 OK 取消");
+}
+
 static void connect_target(void) {
+    if(!target_count){show_home();return;}
     if (!disconnect_target()) return;
     manual_machine_selection = false; state.page = MT_CONNECTING;
     state.session_count = 0;
@@ -193,8 +250,15 @@ static void connect_target(void) {
         if (!mt_ble_start(name, generation, ble_event)) { status("蓝牙启动失败"); render("长按 OK 返回\n\n可以选择 Wi-Fi 连接"); return; }
         status("等待蓝牙连接"); render("请启动电脑上的桥接\n\n首次连接请在 Windows\n输入卡片上的配对码\n\n已配对的电脑会自动连接");
     } else {
-        if (!start_wifi()) { status("Wi-Fi 不可用"); render("请检查预置 Wi-Fi 配置\n\n长按 OK 返回"); return; }
-        status("正在连接 Wi-Fi"); render("正在尝试预置 Wi-Fi\n\n随后连接所选电脑");
+        wifi_count=0;wifi_index=0;memset(wifi_networks,0,sizeof(wifi_networks));
+        const cJSON *wifi=mt_config_server_wifi(device_config,target_index);
+        if(wifi) {
+            memcpy(wifi_networks[0].sta.ssid,str((cJSON *)wifi,"ssid"),strlen(str((cJSON *)wifi,"ssid")));
+            memcpy(wifi_networks[0].sta.password,str((cJSON *)wifi,"password"),strlen(str((cJSON *)wifi,"password")));wifi_count=1;
+        }
+        if (!wifi_count||!start_wifi()) { status("Wi-Fi 不可用"); render("请检查预置 Wi-Fi 配置\n\n长按 OK 返回"); return; }
+        wifi_deadline=esp_timer_get_time()+30000000;
+        status("正在连接主机 Wi-Fi");render("使用所选主机的 Wi-Fi\n\n30 秒未连上会提示失败\n\n长按 OK 返回");
     }
 }
 static void wifi_event(void *arg, esp_event_base_t base, int32_t id, void *data) {
@@ -255,9 +319,20 @@ static void start_audio(void) {
     atomic_store(&audio_seconds, 0); atomic_store(&audio_level, 0); atomic_store(&audio_running, true);
     status("录音中  OK 发送"); xTaskNotifyGive(audio_task_handle);
 }
+static void handle_pair_offer(cJSON *offer) {
+    if(state.page!=MT_PAIRING||pair_finished||!pair_nonce[0]||strcmp(str(offer,"type"),"pair_offer")||
+       strcmp(str(offer,"nonce"),pair_nonce)||strcmp(str(offer,"deviceId"),device_id))return;
+    cJSON *server=cJSON_GetObjectItem(offer,"server");
+    pair_candidate=mt_config_enroll(device_config,server);
+    if(!pair_candidate){status("添加信息无效或主机已满");render(NULL);return;}
+    snprintf(pair_server_id,sizeof(pair_server_id),"%s",str(server,"id"));
+    char body[180];snprintf(body,sizeof(body),"添加这台电脑？\n\n%s\n\n按 OK 确认\n长按 OK 取消",str(server,"name"));
+    state.page=MT_PAIR_CONFIRM;status("确认添加主机");render(body);
+}
 static void handle_json(const char *data) {
     if (!data) return;
     cJSON *o = cJSON_Parse(data); if (!o) return;
+    if(state.page==MT_PAIRING||state.page==MT_PAIR_CONFIRM){handle_pair_offer(o);cJSON_Delete(o);return;}
     const char *type = str(o, "type");
     if (!strcmp(type, "challenge")) {
         const char *challenge = str(o, "challenge"), *secret = targets[target_index].secret;
@@ -313,7 +388,17 @@ static void handle_json(const char *data) {
 static void handle_key(int key, int action) {
     if (action == BSP_BTN_LONG && key == BSP_BTN_OK) {
         if (!disconnect_target()) return;
-        manual_machine_selection = true; show_machines(); return;
+        manual_machine_selection=true;home_index=target_count?0:1;show_home();return;
+    }
+    if(state.page==MT_SETUP)return;
+    if(state.page==MT_PAIRING)return;
+    if(state.page==MT_PAIR_CONFIRM) {
+        if(action!=BSP_BTN_CLICK||key!=BSP_BTN_OK||!pair_candidate)return;
+        if(mt_config_save(pair_candidate)!=ESP_OK){status("保存失败，OK 重试");render(NULL);return;}
+        cJSON_Delete(device_config);device_config=pair_candidate;pair_candidate=NULL;read_settings();
+        cJSON *ack=message("pair_saved");cJSON_AddStringToObject(ack,"nonce",pair_nonce);cJSON_AddStringToObject(ack,"serverId",pair_server_id);send_json(ack);
+        pair_finished=true;pair_deadline=0;pair_close_at=esp_timer_get_time()+2500000;state.page=MT_PAIRING;
+        status("主机已保存");render("添加成功\n\n即将返回首页\n选择 Server list 连接");return;
     }
     if (state.recording) {
         if (key == BSP_BTN_OK && action == BSP_BTN_CLICK) {
@@ -328,7 +413,11 @@ static void handle_key(int key, int action) {
         state.selected = (state.selected + state.session_count + direction) % state.session_count; choose_session(); return;
     }
     if (action != BSP_BTN_CLICK) return;
-    if (state.page == MT_MACHINES) {
+    if(state.page==MT_HOME) {
+        if(key!=BSP_BTN_OK){int first=target_count?0:1,count=target_count?3:2;home_index=first+(home_index-first+count+direction)%count;show_home();}
+        else if(home_index==0){if(target_count)show_machines();else{status("暂无主机，请选择 Add server");render(NULL);}}
+        else if(home_index==1)enter_pairing();else enter_config_upload();
+    } else if (state.page == MT_MACHINES) {
         if (key == BSP_BTN_OK) { state.transport = MT_BLUETOOTH; show_transports(); }
         else if (key != BSP_BTN_OK) { target_index = (target_index + target_count + direction) % target_count; show_machines(); }
     } else if (state.page == MT_TRANSPORT) {
@@ -345,23 +434,16 @@ static void handle_key(int key, int action) {
     }
 }
 void app_main(void) {
-    cJSON *config = cJSON_Parse(MT_CONFIG_JSON);
-    if (!config) return;
-    device_id = str(config, "deviceId");
-    cJSON *target;
-    cJSON_ArrayForEach(target, cJSON_GetObjectItem(config, "targets")) {
-        if (target_count >= 4) break;
-        targets[target_count++] = (target_t){ .name = str(target, "name"), .url = str(target, "url"), .secret = str(target, "secret"), .bluetooth_name = str(target, "bluetoothName") };
-    }
-    if (!target_count) return;
+    device_config=mt_config_empty();if(!device_config)return;
+    device_id=str(device_config,"deviceId");
     for (int i = 0; i < 4; i++) snprintf(boot_id + i*8, 9, "%08lx", (unsigned long)esp_random());
     events = xQueueCreate(16, sizeof(event_t)); audio_stopped = xSemaphoreCreateBinary();
     if (!events || !audio_stopped) return;
     ESP_ERROR_CHECK(bsp_display_init());
     if (!bsp_lvgl_init()) return;
     if (!bsp_lvgl_lock(1000)) return;
-    mt_ui_init(!strcmp(str(config, "skin"), "reading")); bsp_lvgl_unlock();
-    bsp_battery_init(); state.transport = MT_BLUETOOTH; manual_machine_selection = true; show_machines();
+    mt_ui_init(!strcmp(str(device_config, "skin"), "reading")); bsp_lvgl_unlock();
+    bsp_battery_init();state.transport=MT_BLUETOOTH;manual_machine_selection=true;home_index=1;show_home();
     /* The BSP initializes backlight PWM to zero; enable it after creating the UI. */
     bsp_display_backlight(80);
     ESP_ERROR_CHECK(bsp_button_init(key_event, NULL));
@@ -371,15 +453,14 @@ void app_main(void) {
     /* Never erase NVS to conceal a partition or schema mismatch. */
     if (nvs_flash_init() != ESP_OK) { status("NVS 初始化失败"); render("请检查固件分区配置"); return; }
     ESP_ERROR_CHECK(esp_netif_init()); ESP_ERROR_CHECK(esp_event_loop_create_default());
-    cJSON *net;
-    cJSON_ArrayForEach(net, cJSON_GetObjectItem(config, "wifiNetworks")) {
-        if (wifi_count >= 8) break;
-        const char *ssid = str(net, "ssid"), *password = str(net, "password");
-        if (!strlen(ssid) || strlen(ssid) > 32 || strlen(password) > 63) continue;
-        memcpy(wifi_networks[wifi_count].sta.ssid, ssid, strlen(ssid));
-        memcpy(wifi_networks[wifi_count].sta.password, password, strlen(password));
-        wifi_count++;
+    cJSON *loaded=mt_config_load();bool recovery=!loaded;
+    if(loaded){cJSON_Delete(device_config);device_config=loaded;}
+    if(!strcmp(str(device_config,"deviceId"),"mirtar-new")) {
+        char id[40];snprintf(id,sizeof(id),"mirtar-%08lX%08lX",(unsigned long)esp_random(),(unsigned long)esp_random());
+        cJSON_ReplaceItemInObjectCaseSensitive(device_config,"deviceId",cJSON_CreateString(id));
     }
+    read_settings();home_index=target_count?0:1;show_home();
+    if(recovery){status("旧配置需转换后重新导入");render(NULL);}
     printf("MirTar startup: heap=%u largest=%u, microphone_idle=off\n", (unsigned)esp_get_free_heap_size(),
         (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
     int64_t last_render = 0;
@@ -391,16 +472,24 @@ void app_main(void) {
             case EV_KEY: handle_key(event.key, event.action); break;
             case EV_WIFI_ON:
                 if (state.transport != MT_WIFI || manual_machine_selection || !wifi_started) break;
-                state.wifi = true; wifi_attempt_active = false; wifi_retry_at = wifi_attempt_deadline = 0; connect_websocket(); break;
+                state.wifi=true;wifi_deadline=0;wifi_attempt_active=false;wifi_retry_at=wifi_attempt_deadline=0;connect_websocket();break;
             case EV_WIFI_OFF:
                 if (state.transport != MT_WIFI || manual_machine_selection || !wifi_started) break;
+                if(!wifi_count)break;
                 if (!event.action && !state.wifi && !wifi_attempt_active) break;
+                if(state.wifi)wifi_deadline=esp_timer_get_time()+30000000;
                 wifi_attempt_active = false;
                 state.wifi = false; atomic_store(&audio_submit, false); atomic_store(&audio_running, false); mt_disconnect(&state);
                 if (!event.action) wifi_index = (wifi_index + 1) % wifi_count;
                 wifi_attempt_deadline = 0; wifi_retry_at = esp_timer_get_time() + 1500000;
                 state.page = MT_CONNECTING; status("正在尝试预置 Wi-Fi"); render(NULL); break;
             case EV_WS_ON: {
+                if(state.page==MT_PAIRING||state.page==MT_PAIR_CONFIRM) {
+                    if(pair_finished)break;
+                    cJSON_Delete(pair_candidate);pair_candidate=NULL;state.page=MT_PAIRING;
+                    for(int i=0;i<4;i++)snprintf(pair_nonce+i*8,9,"%08lx",(unsigned long)esp_random());
+                    cJSON *hello=message("pair_hello");cJSON_AddStringToObject(hello,"deviceId",device_id);cJSON_AddStringToObject(hello,"nonce",pair_nonce);send_json(hello);break;
+                }
                 state.connected = true;
                 printf("MirTar link: mode=%s heap=%u largest=%u\n", state.transport == MT_BLUETOOTH ? "BLE" : "Wi-Fi",
                     (unsigned)esp_get_free_heap_size(), (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
@@ -408,6 +497,9 @@ void app_main(void) {
                 status("正在校验电脑绑定"); render(NULL); break;
             }
             case EV_WS_OFF:
+                if(state.page==MT_PAIRING||state.page==MT_PAIR_CONFIRM) {
+                    if(!pair_finished){cJSON_Delete(pair_candidate);pair_candidate=NULL;pair_nonce[0]=0;state.page=MT_PAIRING;status("蓝牙断开，等待重新添加");render("请在电脑重试\n\n长按 OK 取消");}break;
+                }
                 atomic_store(&audio_submit, false); atomic_store(&audio_running, false); mt_disconnect(&state);
                 if (!manual_machine_selection) { state.page = MT_CONNECTING; status("电脑连接断开，重试中"); render(NULL); }
                 break;
@@ -416,6 +508,9 @@ void app_main(void) {
                 status("等待 Windows 配对"); render(body); break;
             }
             case EV_JSON: handle_json(event.json); break;
+            case EV_CONFIG:
+                if(state.page!=MT_SETUP||!mt_portal_active())break;
+                free(pending_config);pending_config=event.json;event.json=NULL;config_apply_at=esp_timer_get_time()+800000;break;
             case EV_AUDIO_DONE:
                 if ((uint32_t)event.key != recording_id) break;
                 state.recording = false;
@@ -425,16 +520,28 @@ void app_main(void) {
             free(event.json);
         }
         int64_t now = esp_timer_get_time();
+        if(pending_config&&now>=config_apply_at) {
+            cJSON *candidate=mt_config_parse(pending_config,strlen(pending_config)+1);free(pending_config);pending_config=NULL;
+            if(!candidate||mt_config_save(candidate)!=ESP_OK){cJSON_Delete(candidate);mt_portal_status("error");status("保存失败，请重新上传");render(NULL);}
+            else{cJSON_Delete(device_config);device_config=candidate;read_settings();mt_portal_snapshot(device_config);mt_portal_status("saved");portal_close_at=now+3000000;status("配置已保存，即将返回首页");render(NULL);}
+        }
+        if((portal_close_at&&now>=portal_close_at)||(pair_close_at&&now>=pair_close_at)||(pair_deadline&&now>=pair_deadline)) {
+            if(disconnect_target()){manual_machine_selection=true;home_index=target_count?0:1;show_home();}
+        }
+        if(state.transport==MT_WIFI&&!manual_machine_selection&&!state.wifi&&wifi_deadline&&now>=wifi_deadline) {
+            wifi_deadline=wifi_retry_at=wifi_attempt_deadline=0;wifi_attempt_active=false;manual_machine_selection=true;esp_wifi_disconnect();
+            status("主机 Wi-Fi 连接失败");render("检查该主机的 Wi-Fi 和地址\n\n需要修改时返回首页\n选择 Add config-file\n\n长按 OK 返回");
+        }
         if (state.transport == MT_WIFI && !manual_machine_selection && !state.wifi && wifi_attempt_deadline && now >= wifi_attempt_deadline) {
             wifi_attempt_deadline = 0; esp_wifi_disconnect();
             /* A missed disconnect callback must not strand network selection. */
-            post((event_t){ .kind = EV_WIFI_OFF });
+            post((event_t){ .kind = EV_WIFI_OFF, .generation=generation });
         }
         if (state.transport == MT_WIFI && !manual_machine_selection && !state.wifi && wifi_retry_at && now >= wifi_retry_at) {
             wifi_retry_at = 0;
             wifi_attempt_active = true;
             esp_wifi_set_config(WIFI_IF_STA, &wifi_networks[wifi_index]);
-            if (esp_wifi_connect() != ESP_OK) post((event_t){ .kind = EV_WIFI_OFF });
+            if (esp_wifi_connect() != ESP_OK) post((event_t){ .kind = EV_WIFI_OFF, .generation=generation });
             else wifi_attempt_deadline = now + 15000000;
         }
         if (state.recording && esp_timer_get_time() - last_render > 250000) {

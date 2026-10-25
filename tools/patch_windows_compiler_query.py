@@ -8,14 +8,35 @@ from pathlib import Path
 import sys
 
 path = Path(sys.argv[1])/'tools/cmake/compiler_query.cmake'
-source = path.read_text(encoding='utf-8')
+source = path.read_text(encoding='utf-8').replace('if(WIN32)', 'if(CMAKE_HOST_WIN32)')
+path.write_text(source, encoding='utf-8')
+query_helper = Path(__file__).with_name('verified_compiler_query.py')
+(path.parent/'mirtar_compiler_query.py').write_text(query_helper.read_text(encoding='utf-8'), encoding='utf-8')
+capture_marker = '# MirTar: file-backed capture of real compiler query output.'
+capture_anchor = '''    execute_process(
+        COMMAND ${ARGN}
+        OUTPUT_VARIABLE query_output
+        RESULT_VARIABLE query_result
+        OUTPUT_STRIP_TRAILING_WHITESPACE)'''
+if capture_marker not in source:
+    assert source.count(capture_anchor) == 1, 'Unexpected compiler query helper; no capture patch applied'
+    captured = '''    # MirTar: file-backed capture of real compiler query output.
+    if(CMAKE_HOST_WIN32)
+        execute_process(COMMAND "${PYTHON}" "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/mirtar_compiler_query.py" ${ARGN}
+            OUTPUT_VARIABLE query_output RESULT_VARIABLE query_result OUTPUT_STRIP_TRAILING_WHITESPACE)
+    else()
+'''+capture_anchor+'''
+    endif()'''
+    source = source.replace(capture_anchor, captured)
+    path.write_text(source, encoding='utf-8')
+    print('Enabled real compiler file capture; original fatal query guard retained')
 marker = '# MirTar: bounded retry for zero-exit empty Windows tool output.'
 if marker in source:
     print('Compiler query retry already present')
 anchor = '    if(NOT query_result EQUAL 0 OR query_output STREQUAL "")'
 assert source.count(anchor) == 1, 'Unexpected SDK helper; no patch applied'
 retry = '''    # MirTar: bounded retry for zero-exit empty Windows tool output.
-    if(WIN32)
+    if(CMAKE_HOST_WIN32)
         foreach(query_attempt RANGE 1 12)
             if(NOT query_result EQUAL 0 OR NOT query_output STREQUAL "")
                 break()

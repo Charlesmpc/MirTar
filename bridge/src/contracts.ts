@@ -12,6 +12,7 @@ export type BridgeConfig = {
   version: 1;
   listen: { host: string; port: number; allowLanPlaintext: boolean };
   bluetooth?: { enabled: boolean; hostName?: string };
+  server?: { id: string; name: string };
   devices: { id: string; secret: string }[];
   codex: { bin: string; edgePath: string; sessions: Session[] };
 };

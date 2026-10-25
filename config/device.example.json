@@ -1,19 +1,27 @@
 {
-  "version": 1,
+  "version": 2,
   "template": true,
   "deviceId": "mirtar-card-1",
   "skin": "reading",
   "allowLanPlaintext": true,
-  "wifiNetworks": [
-    { "ssid": "HOME_2G", "password": "FILL_LOCALLY" },
-    { "ssid": "OFFICE_2G", "password": "FILL_LOCALLY" }
-  ],
-  "targets": [
+  "servers": [
     {
-      "name": "Windows",
-      "bluetoothName": "Windows",
-      "url": "ws://192.168.1.10:28743/device",
-      "secret": "REPLACE_WITH_A_LOCALLY_GENERATED_RANDOM_SECRET_64_HEX"
+      "id": "work-laptop",
+      "name": "Work laptop",
+      "bluetoothName": "WorkLaptop",
+      "secret": "REPLACE_WITH_A_LOCALLY_GENERATED_RANDOM_SECRET_64_HEX",
+      "wifi": {
+        "ssid": "OFFICE_2G",
+        "password": "FILL_LOCALLY",
+        "url": "ws://192.168.1.10:28743/device"
+      }
+    },
+    {
+      "id": "travel-laptop",
+      "name": "Travel laptop",
+      "bluetoothName": "TravelLaptop",
+      "secret": "REPLACE_WITH_A_DIFFERENT_LOCALLY_GENERATED_RANDOM_SECRET_64_HEX",
+      "wifi": null
     }
   ]
 }

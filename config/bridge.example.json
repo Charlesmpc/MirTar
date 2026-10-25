@@ -1,6 +1,7 @@
 {
   "version": 1,
-  "bluetooth": { "enabled": true, "hostName": "Windows" },
+  "server": { "id": "work-laptop", "name": "Work laptop" },
+  "bluetooth": { "enabled": true, "hostName": "WorkLaptop" },
   "listen": { "host": "192.168.1.10", "port": 28743, "allowLanPlaintext": true },
   "devices": [{ "id": "mirtar-card-1", "secret": "SAME_LOCAL_SECRET_AS_DEVICE_TARGET" }],
   "codex": {

@@ -6,10 +6,10 @@ import { hostname } from 'node:os';
 import type { DevicePeer } from './peer.ts';
 import { BleAssembler, fragmentBle } from './ble-framing.ts';
 
-export function startWindowsBle(hostName: string | undefined, accept: (peer: DevicePeer) => void) {
+export function startWindowsBle(hostName: string | undefined, accept: (peer: DevicePeer) => void, pairing = false) {
   const name = hostName || hostname();
   if (!/^[a-zA-Z0-9_-]{1,20}$/.test(name)) throw Error('invalid_bluetooth_host_name');
-  const worker = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', resolve('tools/Start-Bluetooth.ps1'), '-HostName', name],
+  const worker = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', resolve('tools/Start-Bluetooth.ps1'), '-HostName', name, ...(pairing ? ['-Pairing'] : [])],
     { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env,
       // Node may inherit PS7's module path. Windows PowerShell needs its own
       // built-in modules (Get-FileHash, file operations), without changing globals.

@@ -1,5 +1,7 @@
 # Windows bridge package
 
+> 当前开发版的主机、配置与引导逻辑见[新设计与步骤](server-onboarding.zh_CN.md)。下文保留为旧版历史说明，配置结构和启动步骤不再作为当前指引。
+
 [简体中文](windows-bridge-package.zh_CN.md)
 
 The preview ZIP contains the Windows bridge's Node.js/TypeScript sources, tests, startup helpers and placeholder templates. Dependencies are installed locally. Node.js itself, Codex, Microsoft Edge and configured badge firmware are not bundled. Use the full source archive or repository for firmware builds.

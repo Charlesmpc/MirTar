@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MirTar · Add config-file</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,sans-serif;background:#172033;color:#e7edf8}*{box-sizing:border-box}body{max-width:32rem;margin:auto;padding:28px 20px}small,p{color:#acb9d2;line-height:1.7}.brand{letter-spacing:.15em;color:#b7c6fa}h1{font-size:1.8rem}form{background:#243049;padding:22px;border-radius:18px}label{display:block;margin:18px 0 8px}input{width:100%;background:#172033;border:1px solid #60718d;color:inherit;border-radius:9px;padding:13px;font:inherit}button{width:100%;padding:14px;border:0;border-radius:9px;background:#b7c6fa;color:#172033;font:inherit;font-weight:650;margin-top:22px}button:disabled{opacity:.5}#status{white-space:pre-line;min-height:3em}code{overflow-wrap:anywhere}
+</style>
+<body><div class="brand">MIRTAR / LOCAL SETUP</div><h1>传递 config-file</h1>
+<p>上传电脑上准备好的设备配置。每台主机保存自己的蓝牙信息，以及可选的 Wi-Fi 名称、密码和电脑地址。此页面不扫描设备，也不单独填写 Wi-Fi。</p>
+<form id="setup"><label for="config">device.config.json · version 2</label><input id="config" type="file" accept=".json,application/json" required>
+<p>同一主机 ID 会更新，其他主机会保留，最多四台。已有主机时，文件的 deviceId 必须与这张卡片一致。</p>
+<small>卡片 deviceId：<code id="device-id">正在读取…</code>。不要上传 bridge.config.json 或占位模板。文件只传给当前卡片，不发送到云端。</small>
+<button id="save" type="submit" disabled>上传并保存配置</button></form><p id="status" role="status" aria-live="polite">正在连接卡片…</p>
+<p>保存成功后，卡片回到首页；手机或电脑可切回原网络，再到 Server list 选择主机。提示热点无互联网时保持连接，长按卡片 OK 可退出。</p>
+<script>
+const form=document.getElementById('setup'),button=document.getElementById('save'),statusText=document.getElementById('status');
+let csrf='',waiting=false,finished=false;
+function show(text){statusText.textContent=text;}
+async function poll(){
+ try{const r=await fetch('/api/status',{cache:'no-store'});if(!r.ok)throw Error();const s=await r.json();csrf=s.csrf;document.getElementById('device-id').textContent=s.deviceId;
+ waiting=['saving','saved'].includes(s.phase);button.disabled=waiting||!csrf;
+ show(s.phase==='saved'?'配置已保存！卡片即将返回首页。':s.phase==='saving'?'正在保存配置…':s.phase==='error'?'保存失败，请重新上传。':`已保存 ${s.servers} 台主机。请选择准备好的配置文件。`);
+ if(s.phase==='saved'){finished=true;return;}
+ }catch{show('请保持连接卡片热点，再打开 http://192.168.4.1。');button.disabled=true;}
+ if(!finished)setTimeout(poll,1200);
+}
+form.addEventListener('submit',async e=>{
+ e.preventDefault();if(waiting||!csrf)return;
+ const file=document.getElementById('config').files[0];if(!file){show('请选择 device.config.json。');return;}
+ try{if(file.size>4096)throw Error('配置最多 4096 字节。');
+ let config;try{config=JSON.parse((await file.text()).replace(/^\uFEFF/,''));}catch{throw Error('配置文件无法读取，请选择有效的 JSON。');}
+ if(config.version!==2||config.template||!Array.isArray(config.servers)||!config.servers.length||config.servers.length>4||config.wifiNetworks||config.targets)throw Error('请选择 version 2 主机配置，旧格式请先在电脑转换。');
+ const body=JSON.stringify(config);if(new TextEncoder().encode(body).length>4096)throw Error('配置最多 4096 字节。');
+ waiting=true;button.disabled=true;show('正在上传配置…');
+ const r=await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json','X-MirTar-Setup':csrf},body});
+ if(!r.ok)throw Error(r.status===409?'卡片正在保存，请稍候。':'配置无效：请检查 deviceId、主机 ID、绑定信息、Wi-Fi 和四台主机上限。');
+ }catch(error){waiting=false;button.disabled=!csrf;show(error.message||'上传失败，请重试。');}
+});poll();
+</script></body></html>
