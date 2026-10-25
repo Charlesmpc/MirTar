@@ -1,7 +1,8 @@
 # Server onboarding (development build)
 
 This branch starts from v0.3.1, retaining the reading skin and Codex voice path. Its version is `0.5.1`.
-It does not replace the v0.4.0 community submission. Compilation and host tests do not establish device acceptance.
+The public v0.5.1 image was submitted for community review on 2026-10-25 (project 1619, revision 3705).
+Its receipt is pending; compilation and host tests do not establish device acceptance.
 
 The home screen has **Server list** when hosts exist, plus **Add server** and **Add config-file**.
 Server list opens saved hosts; Bluetooth is the default transport.

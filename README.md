@@ -95,7 +95,8 @@ v0.3.1 compiled settings and v0.4.0 stored settings are not automatically migrat
 - [Build and flash](docs/device-quickstart.md) / [中文](docs/device-quickstart.zh_CN.md)
 - [Validation status](docs/validation/server-onboarding-0.5.1.md)
 
-This development version has not been released or submitted to the community.
+v0.5.1 was submitted for community review on 2026-10-25 (project 1619, revision 3705).
+The verified receipt is **pending review**, not confirmation of public availability.
 Build the credential-free image locally; preserve earlier verified images for rollback.
 
 The planned public release is **0.5.1**. A default build never reads personal config and starts with no saved hosts on fresh NVS.
