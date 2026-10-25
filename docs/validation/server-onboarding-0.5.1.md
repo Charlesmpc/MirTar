@@ -39,7 +39,7 @@ zero known-credential/personal matches in the public binary; personal preset rea
 tests; native worker compilation and slow-subscribe/notification-gate tests; actual C state/config host tests; four isolated
 PowerShell recovery scenarios (ordinary startup, active-worker guard, explicit reset and failed reset). PowerShell tests use
 mock Bluetooth/node commands and do not remove real pairings. Source index/history privacy audit found zero credential
-or personal findings. Flash validation was `-WhatIf` only.
+or personal findings. The automated development flash check used `-WhatIf` only; later owner-run device validation is recorded below.
 
 The actual bond-store host tests additionally cover per-server key/identity isolation, stable IDs across reconnect,
 scoped reset with another host unchanged, untouched legacy/config namespaces, staging promotion retaining its identity,
@@ -47,7 +47,12 @@ copy/commit failures preserving the previous selected generation, collision/SDK 
 records for another host. Manifest generation also verifies actual ELF storage symbols; release guards reject the earlier
 reset-all v0.5.1 preview. The per-server implementation supersedes that unreleased local preview.
 
-Physical checks remain pending: screen readability and confirmation/cancel, persistent per-server deletion, retained
-other-host bonds/config, fresh Windows PIN with a static random identity, enrollment-to-normal identity reuse,
-session/voice/reply path, NVS space with four hosts and failure during flash writes. No card is flashed, reset or unpaired
-during development checks. See [storage layout](../bluetooth-storage.md).
+## Owner-reported device acceptance — 2026-10-25
+
+The owner confirmed that v0.5.1 was verified successfully on a physical card. This records the owner's test result;
+the automated build and host checks above remain separate evidence. Personal firmware, configuration, device logs
+and pairing records are kept locally and are not attached to this public report.
+
+The report did not enumerate individual scenarios. Clean-NVS first-use enrollment, cross-host bond retention,
+four-host capacity and interrupted-write recovery still need recorded case-by-case device coverage.
+No additional device actions were performed while recording this result. See [storage layout](../bluetooth-storage.md).

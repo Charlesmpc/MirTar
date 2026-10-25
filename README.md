@@ -32,10 +32,11 @@ plaintext traffic and must stay on a trusted LAN.
 
 The OS integration is a separate adapter layer. **Windows is implemented today;
 macOS and Linux bridges are planned.** The current Agent adapter is Codex.
-**Development branch: v0.5.1**, rebuilt from the verified v0.3.1 baseline.
+**Current version: v0.5.1**, rebuilt from the verified v0.3.1 baseline.
 The new home has **Server list / Add server / Add config-file**. Bluetooth enrollment exchanges host identity and binding;
 file import uses an explicitly opened card hotspot. Each host owns its own optional Wi-Fi settings.
-The new flows need physical-device acceptance; earlier v0.3.x owner testing is not evidence for this revision.
+The owner confirmed successful physical-device validation of v0.5.1 on 2026-10-25.
+See the [validation record](docs/validation/server-onboarding-0.5.1.md) for the evidence and remaining test coverage.
 
 ## How it works
 
@@ -99,7 +100,7 @@ v0.5.1 was submitted for community review on 2026-10-25 (project 1619, revision 
 The verified receipt is **pending review**, not confirmation of public availability.
 Build the credential-free image locally; preserve earlier verified images for rollback.
 
-The planned public release is **0.5.1**. A default build never reads personal config and starts with no saved hosts on fresh NVS.
+The public firmware version is **0.5.1**. A default build never reads personal config and starts with no saved hosts on fresh NVS.
 Use `Build-PersonalFirmware.ps1` for a separately labeled local image containing an NVS preset. Its app remains version 0.5.1;
 its package and card label include the selected personal suffix. Personal images must never enter a Release or community upload.
 One public codebase is maintained; the old private history archive does not need ongoing development.

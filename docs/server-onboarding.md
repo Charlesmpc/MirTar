@@ -2,7 +2,8 @@
 
 This branch starts from v0.3.1, retaining the reading skin and Codex voice path. Its version is `0.5.1`.
 The public v0.5.1 image was submitted for community review on 2026-10-25 (project 1619, revision 3705).
-Its receipt is pending; compilation and host tests do not establish device acceptance.
+Its submission receipt was pending. The owner subsequently confirmed successful device validation on 2026-10-25;
+community review status is separate from hardware validation.
 
 The home screen has **Server list** when hosts exist, plus **Add server** and **Add config-file**.
 Server list opens saved hosts; Bluetooth is the default transport.
@@ -103,5 +104,5 @@ The separate `Build-PersonalFirmware.ps1` packages private NVS presets; see [bui
 Press OK to record and again to submit; UP/DOWN scroll, hold them to switch sessions, hold OK to return home.
 Codex still owns sessions and ASR. No TTS, Cursor, other host OS or OTA implementation is added.
 NVS is not encrypted; business Wi-Fi is trusted-LAN plaintext. Config, backups, audio and logs must stay private.
-Hardware acceptance remains pending: new navigation, enrollment/cancellation/reconnection, confirmed persistence,
-hotspot QR/upload, restart recovery, host-specific Wi-Fi selection and voice/reply continuity.
+The owner confirmed successful v0.5.1 device validation on 2026-10-25.
+Individual scenario results and broader failure testing are tracked in the [validation record](validation/server-onboarding-0.5.1.md).

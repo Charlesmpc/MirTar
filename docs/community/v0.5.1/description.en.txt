@@ -2,4 +2,4 @@ Turn AI Passport into a handheld controller for Codex on your computer. Press OK
 
 Add and connect your own computer over Bluetooth by default, without preloading your home Wi-Fi. You can also import a configuration file for trusted local Wi-Fi. The card-to-computer control link needs no public relay.
 
-A Windows computer running the companion bridge is required; Codex itself still needs internet access. The new Bluetooth enrollment, per-computer pairing isolation and recovery flows await physical-device acceptance, so this version is intended for people willing to test. The cover is a concept illustration.
+A Windows computer running the companion bridge is required; Codex itself still needs internet access. The owner has confirmed successful device testing of v0.5.1. The cover is a concept illustration.
