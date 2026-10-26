@@ -1,0 +1,5 @@
+Turn AI Passport into a handheld controller for Codex on your computer. Press OK to speak, press again to send, and read the reply on the card. Continue the same session at your desktop. Physical buttons let you scroll replies and switch sessions without wearing a headset or leaning toward the computer microphone, while your phone stays free for other things.
+
+Add and connect your own computer over Bluetooth by default, with no Wi-Fi setup on the card. You can also import a configuration file for trusted local Wi-Fi. Voice starts forwarding to Codex while you speak, reducing the wait after recording. Each recording has a ten-minute limit.
+
+A Windows computer running the companion bridge is required; Codex itself still needs internet access. The public firmware includes no creator-specific computers or network settings: add your own computer on first use. The cover is a concept illustration.

@@ -1,0 +1,6 @@
+- Voice now forwards to Codex during recording, removing the need to replay the entire clip after you finish speaking.
+- The card and bridge recording limit increases from 30 seconds to ten minutes.
+- After recording ends, MirTar waits for the final words and normal recognition completion before sending one complete request to the original session. Incomplete or cancelled input is not submitted; uncertain submissions are never automatically replayed.
+- Fixed error handling when a continuous audio stream is interrupted and clarified the card's recognition, submission and waiting-for-reply messages.
+
+Update both the card firmware and Windows bridge to 0.5.2, stop the old bridge and restart it. Existing private configuration can be reused. Updating only the bridge leaves an older card's 30-second capture cap in place.
