@@ -335,3 +335,12 @@ ESP-IDF 5.5.6 / LVGL 9.5.0 占位配置固件已完成构建、链接、完整�
 - [ESP-IDF 6.0：加密与 TLS 迁移](https://docs.espressif.com/projects/esp-idf/en/v6.0/esp32c3/migration-guides/release-6.x/6.0/security.html)
 
 官方页面于 2026-10-24 查阅；实际接入以 T01 记录的本机版本、账号和端到端结果为准。
+
+
+## 0.5.2：实时音频与长录音
+
+录音硬上限为 600 秒，桥接端接收期限 605 秒；累计 PCM16/16 kHz/单声道上限 19.2 MB，不代表卡片需要这些内存。卡片继续每 20 ms 发送 640 字节 PCM。桥接协议只计数、校验序号，逐块交给 Agent adapter 的 `beginAudio → append → commit` 接口，不再拼接完整 WAV 后播放。Agent 仍拥有正式会话和执行记录。
+
+Codex adapter 在 begin 时启动原生 WebRTC v3，电脑端 PcmStream 与媒体引擎 AudioWorklet 使用各自最多 30 秒的积压缓冲。采集、传输、识别重叠进行。只有显式 commit 且帧数正确，才结束媒体流；消费总采样数必须准确匹配，随后输出两秒静音并请求 `session.close`。有序数据通道上的 `input_transcript.added` 按片段 ID 去重、按音频时间排序；正常 `session.closed` 是最终收尾屏障。没有最终标志就不提交任务，绝不以静音或助手回复推断识别完成。收尾等待 90 秒，全程另有限时；文本最多 64,000 字符。
+
+取消、断线、无序帧、缓冲溢出、原生语音失败都会中止尚未提交的输入。正式队列投递前仍持久化不重放回执，只投递一次，桌面保持原会话写入者和审批控制。浏览器精确 profile 清理与正常提交解耦，并在桥接关闭时等待完成。Windows、Agent、设备传输的抽象边界保持独立。0.5.1 卡片搭配新桥接可使用流式转发，但卡片仍保留旧的 30 秒上限；10 分钟需要双端更新。

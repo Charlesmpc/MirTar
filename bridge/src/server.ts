@@ -4,9 +4,10 @@ import { readFile, mkdir, writeFile, rename } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { isIPv4 } from 'node:net';
 import { WebSocketServer, WebSocket } from 'ws';
-import type { AgentAdapter, BridgeConfig } from './contracts.ts';
-import { AudioInput, truncateUtf8, verifyProof } from './protocol.ts';
+import type { AgentAdapter, AgentAudioInput, BridgeConfig } from './contracts.ts';
+import { AudioInput, MAX_RECORDING_SECONDS, truncateUtf8, verifyProof } from './protocol.ts';
 import type { DevicePeer } from './transport/peer.ts';
+import { safeInputErrorCode } from './input-error.ts';
 
 type Receipt = { status: string; clientId: string; submissionId?: string };
 export async function startBridge(config: BridgeConfig, adapter: AgentAdapter, receiptRoot = '.private/receipts') {
@@ -28,7 +29,7 @@ export async function startBridge(config: BridgeConfig, adapter: AgentAdapter, r
   function acceptPeer(ws: DevicePeer) {
     peers.add(ws);
     let deviceId = '', bootId = '', secret = '', authenticated = false, selected = '', lastReply = '', polling = false;
-    let recording: AudioInput | undefined, audioTimer: NodeJS.Timeout | undefined;
+    let recording: { input: AudioInput; stream: AgentAudioInput; controller: AbortController } | undefined, audioTimer: NodeJS.Timeout | undefined;
     let operation: AbortController | undefined, alive = true;
     let awaitingReply: { sessionId: string; baseline: string; accepted: boolean; clientId: string; id: number } | undefined;
     const challenge = randomBytes(32).toString('hex');
@@ -45,7 +46,7 @@ export async function startBridge(config: BridgeConfig, adapter: AgentAdapter, r
       if (Buffer.byteLength(encoded) <= 8000) ws.send(encoded);
     };
     const error = (code: string) => send({ type: 'error', code, sessionId: selected });
-    const discard = () => { recording = undefined; clearTimeout(audioTimer); };
+    const discard = () => { recording?.controller.abort(); recording = undefined; clearTimeout(audioTimer); };
     const authTimeout = setTimeout(() => ws.close(1008, 'authentication timeout'), 5000);
     const heartbeat = setInterval(() => { if (!alive) { ws.terminate(); return; } alive = false; ws.ping(); }, 15000);
     ws.on('pong', () => { alive = true; });
@@ -74,7 +75,7 @@ export async function startBridge(config: BridgeConfig, adapter: AgentAdapter, r
       finally { polling = false; }
     }, 1500);
     async function handle(data: Buffer, binary: boolean) {
-      if (binary) { if (!authenticated || !recording) throw Error('unexpected_audio'); recording.append(data); return; }
+      if (binary) { if (!authenticated || !recording) throw Error('unexpected_audio'); recording.stream.append(recording.input.append(data)); return; }
       if (data.length > 2048) throw Error('control_limit');
       const msg = JSON.parse(data.toString('utf8'));
       if (!msg || typeof msg !== 'object') throw Error('invalid_message');
@@ -89,7 +90,7 @@ export async function startBridge(config: BridgeConfig, adapter: AgentAdapter, r
         if (activeDevices.has(deviceId)) throw Error('device_already_connected');
         authenticated = true; activeDevices.add(deviceId); clearTimeout(authTimeout);
         send({ type: 'bound', version: 1, adapterId: adapter.id, sessions: await adapter.sessions(),
-          audio: { codec: 'pcm_s16le', sampleRate: 16000, channels: 1, maxSeconds: 30 },
+          audio: { codec: 'pcm_s16le', sampleRate: 16000, channels: 1, maxSeconds: MAX_RECORDING_SECONDS },
           capabilities: { textReply: true, liveRuntimeState: false, approvals: false, tts: false } }); return;
       }
       if (msg.type === 'select') {
@@ -100,27 +101,35 @@ export async function startBridge(config: BridgeConfig, adapter: AgentAdapter, r
       if (msg.type === 'cancel') { discard(); operation?.abort(); send({ type: 'state', state: 'cancelled', sessionId: selected }); return; }
       if (msg.type === 'begin') {
         if (!selected || recording || operation || awaitingReply) throw Error('busy');
-        recording = new AudioInput(msg.id, selected);
-        audioTimer = setTimeout(() => { discard(); error('audio_timeout'); }, 35000);
+        const input = new AudioInput(msg.id, selected), controller = new AbortController();
+        const stream = adapter.beginAudio(selected, controller.signal, failure => {
+          if (recording?.controller !== controller || controller.signal.aborted) return;
+          console.error('Voice input failed:', safeInputErrorCode(failure));
+          discard(); error('input_failed');
+        });
+        operation = controller; recording = { input, stream, controller };
+        controller.signal.addEventListener('abort', () => { if (operation === controller) operation = undefined; }, { once: true });
+        audioTimer = setTimeout(() => { discard(); error('audio_timeout'); }, (MAX_RECORDING_SECONDS + 5) * 1000);
         send({ type: 'state', state: 'recording', id: msg.id, sessionId: selected }); return;
       }
       if (msg.type === 'commit') {
-        const input = recording; if (!input || input.id !== msg.id) throw Error('no_recording');
-        const pcm = input.finish(msg.frames); discard();
+        const capture = recording; if (!capture || capture.input.id !== msg.id) throw Error('no_recording');
+        const { input, stream, controller } = capture;
+        input.finish(msg.frames);
+        recording = undefined; clearTimeout(audioTimer);
         const baseline = (await adapter.history(input.sessionId)).at(-1)?.turnId || '';
         const key = createHash('sha256').update(`${deviceId}:${bootId}:${input.id}`).digest('hex');
         const receiptPath = resolve(receiptRoot, key + '.json');
         let existing: Receipt | undefined;
         try { existing = JSON.parse(await readFile(receiptPath, 'utf8')); } catch (e: any) { if (e.code !== 'ENOENT') throw Error('receipt_unavailable'); }
-        if (existing) { send({ type: 'state', state: existing.status === 'accepted' ? 'accepted' : 'submission_unknown', sessionId: input.sessionId, id: input.id }); return; }
+        if (existing) { controller.abort(); send({ type: 'state', state: existing.status === 'accepted' ? 'accepted' : 'submission_unknown', sessionId: input.sessionId, id: input.id }); return; }
         const receipt: Receipt = { status: 'submission_unknown', clientId: randomUUID() };
         // Persist a conservative receipt BEFORE any native mutation. No automatic replay.
         await writeFile(receiptPath, JSON.stringify(receipt), { flag: 'wx' });
-        if (ws.readyState !== WebSocket.OPEN) return;
-        const controller = new AbortController(); operation = controller;
+        if (ws.readyState !== WebSocket.OPEN || controller.signal.aborted) { controller.abort(); return; }
         const awaiting = { sessionId: input.sessionId, baseline, accepted: false, clientId: receipt.clientId, id: input.id }; awaitingReply = awaiting;
         const progress = (state: string) => send({ type: 'state', state, sessionId: input.sessionId, id: input.id });
-        const job = adapter.submitAudio(input.sessionId, pcm, receipt.clientId, controller.signal, progress).then(async result => {
+        const job = stream.commit(receipt.clientId, progress).then(async result => {
           receipt.status = 'accepted'; receipt.submissionId = result.submissionId;
           awaiting.accepted = true;
           progress('accepted');
@@ -132,6 +141,7 @@ export async function startBridge(config: BridgeConfig, adapter: AgentAdapter, r
             console.error('Receipt update unavailable; prior no-replay marker retained.');
           }
         }).catch(e => {
+          console.error('Voice input failed:', safeInputErrorCode(e));
           if (e.message !== 'submission_unknown' && awaitingReply === awaiting) awaitingReply = undefined;
           send({ type: 'error', code: e.message === 'submission_unknown' ? 'submission_unknown' :
             controller.signal.aborted ? 'input_cancelled_or_pending' : 'input_failed', sessionId: input.sessionId, id: input.id });
@@ -147,7 +157,7 @@ export async function startBridge(config: BridgeConfig, adapter: AgentAdapter, r
       queuedBytes += data.length;
       if (queuedBytes > 128 * 1024) { ws.close(1008, 'backpressure'); return; }
       queue = queue.then(() => ws.readyState === WebSocket.OPEN ? handle(data, binary) : undefined).catch(e => {
-        if (!['busy', 'recording_locked', 'session_unavailable'].includes(e.message)) discard();
+        if (!['busy', 'recording_locked', 'session_unavailable'].includes(e.message)) { discard(); operation?.abort(); }
         error(['audio_limit', 'audio_timeout', 'busy', 'recording_locked', 'session_unavailable'].includes(e.message) ? e.message : 'protocol_error');
         if (!authenticated) ws.close(1008, 'authentication failed');
       }).finally(() => { queuedBytes -= data.length; });

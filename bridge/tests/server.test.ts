@@ -16,7 +16,12 @@ test('device binds, commits only on explicit end, receives native-style reply; c
   const adapter: AgentAdapter = {
     id: 'test-fixture', sessions: async () => [{ id: 'session-1', name: 'mirtar #1' }, { id: 'session-2', name: 'mirtar #2' }],
     history: async session => completed && session === 'session-2' ? [{ turnId: 'turn-1', text: '中文回复', completed: true, inputId: sourceInput }] : [],
-    submitAudio: async (session, pcm, inputId, _signal, progress) => { assert.equal(session, 'session-2'); assert.equal(pcm.length, 6400); sourceInput = inputId; submissions++; progress('recognizing'); completed = true; return { submissionId: 'native-queue-1' }; },
+    beginAudio: (session, signal) => {
+      let bytes = 0;
+      return { append: pcm => { signal.throwIfAborted(); bytes += pcm.length; },
+        commit: async (inputId, progress) => { signal.throwIfAborted(); assert.equal(session, 'session-2'); assert.equal(bytes, 6400);
+          sourceInput = inputId; submissions++; progress('recognizing'); completed = true; return { submissionId: 'native-queue-1' }; } };
+    },
     close: async () => {},
   };
   const config: BridgeConfig = { version: 1, listen: { host: '127.0.0.1', port: 0, allowLanPlaintext: true }, devices: [{ id: 'test', secret }], codex: { bin: '', edgePath: '', sessions: [] } };
@@ -34,7 +39,7 @@ test('device binds, commits only on explicit end, receives native-style reply; c
     await new Promise<void>((resolve, reject) => { ws.once('open', resolve); ws.once('error', reject); });
     send({ type: 'hello', version: 1, deviceId: 'test', bootId: 'f'.repeat(32) });
     const challenge = await wait('challenge'); send({ type: 'auth', proof: authProof(secret, challenge.challenge) });
-    assert.equal((await wait('bound')).sessions[0].id, 'session-1');
+    const bound = await wait('bound'); assert.equal(bound.sessions[0].id, 'session-1'); assert.equal(bound.audio.maxSeconds, 600);
     send({ type: 'select', sessionId: 'session-1' }); await wait('selected');
     send({ type: 'begin', id: 1 }); await wait('state');
     send({ type: 'select', sessionId: 'session-2' }); assert.equal((await wait('error')).code, 'recording_locked');

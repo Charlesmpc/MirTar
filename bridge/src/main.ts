@@ -23,6 +23,7 @@ try {
   const bluetooth = bluetoothEnabled ? startWindowsBle(config.bluetooth?.hostName, bridge.acceptPeer) : undefined;
   console.log('MirTar bridge ready:', JSON.stringify(bridge.address));
   console.log('Native sessions:', config.codex.sessions.length, '| Bluetooth:', bluetoothEnabled, '| TTS off');
+  console.log('Voice: live native stream | max 10 min | submit only after end and finalization');
   if (!available && bluetoothEnabled) console.log('Configured Wi-Fi IP is unavailable; listener uses loopback. Bluetooth is independent of the LAN.');
   let stopping = false;
   const stop = async () => { if (stopping) return; stopping = true; await bluetooth?.close(); await bridge.close(); process.exit(); };

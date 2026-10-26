@@ -1,11 +1,14 @@
 export type Session = { id: string; name: string };
 export type Reply = { turnId: string; text: string; completed: boolean; inputId?: string };
+export interface AgentAudioInput {
+  append(pcm16k: Buffer): void;
+  commit(inputId: string, progress: (state: string) => void): Promise<{ submissionId: string }>;
+}
 export interface AgentAdapter {
   readonly id: string;
   sessions(): Promise<Session[]>;
   history(sessionId: string): Promise<Reply[]>;
-  submitAudio(sessionId: string, pcm16k: Buffer, inputId: string, signal: AbortSignal,
-    progress: (state: string) => void): Promise<{ submissionId: string }>;
+  beginAudio(sessionId: string, signal: AbortSignal, onFailure?: (error: unknown) => void): AgentAudioInput;
   close(): Promise<void>;
 }
 export type BridgeConfig = {

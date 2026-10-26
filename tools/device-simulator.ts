@@ -3,7 +3,7 @@
 import { readFile } from 'node:fs/promises';
 import { randomBytes } from 'node:crypto';
 import { WebSocket } from 'ws';
-import { authProof } from '../bridge/src/protocol.ts';
+import { authProof, MAX_RECORDING_SECONDS } from '../bridge/src/protocol.ts';
 import type { BridgeConfig } from '../bridge/src/contracts.ts';
 import { setTimeout as delay } from 'node:timers/promises';
 
@@ -24,7 +24,7 @@ for (let pos = 12; pos + 8 <= wav.length;) {
   if (type === 'data') pcm = wav.subarray(start, start + size);
   pos = start + size + size % 2;
 }
-if (!pcm || ![16000, 24000].includes(rate) || pcm.length > rate * 2 * 30) throw Error('Expected 16k/24k mono WAV, at most 30 seconds');
+if (!pcm || ![16000, 24000].includes(rate) || pcm.length > rate * 2 * MAX_RECORDING_SECONDS) throw Error('Expected 16k/24k mono WAV, at most 600 seconds');
 const samples = Math.floor(pcm.length / 2 * 16000 / rate), input = Buffer.alloc(samples * 2);
 for (let i = 0; i < samples; i++) {
   const x = i * rate / 16000, a = Math.floor(x), b = Math.min(a + 1, pcm.length / 2 - 1);
@@ -34,7 +34,7 @@ const device = config.devices[0], sessionId = config.codex.sessions[0].id;
 const ws = new WebSocket(`ws://${config.listen.host}:${config.listen.port}/device`);
 let committed = false, accepted = false;
 let replyReceived = false;
-const timeout = setTimeout(() => { console.error('Integration timeout'); ws.terminate(); process.exitCode = 1; }, 180000);
+const timeout = setTimeout(() => { console.error('Integration timeout'); ws.terminate(); process.exitCode = 1; }, (MAX_RECORDING_SECONDS + 180) * 1000);
 const send = (msg: unknown) => ws.send(JSON.stringify(msg));
 ws.on('open', () => send({ type: 'hello', version: 1, deviceId: device.id, bootId: randomBytes(16).toString('hex') }));
 ws.on('error', () => { console.error('Connection failed'); process.exitCode = 1; clearTimeout(timeout); });
@@ -48,7 +48,7 @@ ws.on('message', async raw => {
     for (let offset = 0; offset < input.length; offset += 640) {
       const chunk = input.subarray(offset, offset + 640), frame = Buffer.alloc(12 + chunk.length);
       frame.write('MTA1'); frame.writeUInt32LE(1, 4); frame.writeUInt32LE(frames++, 8); chunk.copy(frame, 12); ws.send(frame);
-      await delay(10);
+      await delay(20);
     }
     send({ type: 'commit', id: 1, frames }); committed = true;
     console.log('COMMITTED', { frames, audioSeconds: input.length / 32000 });

@@ -32,7 +32,9 @@ plaintext traffic and must stay on a trusted LAN.
 
 The OS integration is a separate adapter layer. **Windows is implemented today;
 macOS and Linux bridges are planned.** The current Agent adapter is Codex.
-**Current version: v0.5.1**, rebuilt from the verified v0.3.1 baseline.
+**Current version: v0.5.2** — live native voice forwarding and up to 10 minutes per recording.
+The bridge forwards audio while you speak, then submits once after you press OK again and native transcription has finished. Update the bridge for streaming; update the firmware as well to remove its old 30-second limit.
+See the [v0.5.2 validation and upgrade notes](docs/validation/streaming-voice-0.5.2.md).
 The new home has **Server list / Add server / Add config-file**. Bluetooth enrollment exchanges host identity and binding;
 file import uses an explicitly opened card hotspot. Each host owns its own optional Wi-Fi settings.
 The owner confirmed successful physical-device validation of v0.5.1 on 2026-10-25.
@@ -100,8 +102,8 @@ v0.5.1 was submitted for community review on 2026-10-25 (project 1619, revision 
 The verified receipt is **pending review**, not confirmation of public availability.
 Build the credential-free image locally; preserve earlier verified images for rollback.
 
-The public firmware version is **0.5.1**. A default build never reads personal config and starts with no saved hosts on fresh NVS.
-Use `Build-PersonalFirmware.ps1` for a separately labeled local image containing an NVS preset. Its app remains version 0.5.1;
+The public firmware version is **0.5.2**. A default build never reads personal config and starts with no saved hosts on fresh NVS.
+Use `Build-PersonalFirmware.ps1` for a separately labeled local image containing an NVS preset. Its app remains version 0.5.2;
 its package and card label include the selected personal suffix. Personal images must never enter a Release or community upload.
 One public codebase is maintained; the old private history archive does not need ongoing development.
 See [build variants and publication guards](docs/build-variants.zh_CN.md).
@@ -113,7 +115,8 @@ are included in the current version, alongside native voice forwarding, existing
 desktop sessions, completed text replies, and two display skins.
 The OS adapter layer is independent; macOS and Linux implementations are planned.
 TTS/card playback, live tool progress/approval UI, Cursor, cloud provisioning and
-OTA are not implemented. Maximum recording: 30 seconds.
+OTA are not implemented. Maximum recording: 10 minutes; press OK again before the limit. Reaching the hard limit cancels the recording instead of submitting without confirmation.
+Native voice still requires Codex online access; startup and finalization latency remain. No independent ASR provider or extra API key is introduced.
 Incomplete input is not submitted; unknown submission outcomes are not replayed.
 
 BLE uses custom GATT; the badge is not a standard Bluetooth headset. Codex

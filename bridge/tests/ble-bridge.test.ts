@@ -42,7 +42,10 @@ test('fragmented BLE uses shared authentication, audio and native-session reply 
   const adapter: AgentAdapter = {
     id: 'ble-test', sessions: async () => [{ id: 'native', name: 'desktop session' }],
     history: async () => input ? [{ turnId: 'reply', text: '同一会话的回复', completed: true, inputId: input }] : [],
-    submitAudio: async (id, pcm, clientId) => { assert.equal(id, 'native'); assert.equal(pcm.length, 6400); input = clientId; submissions++; return { submissionId: 'accepted' }; },
+    beginAudio: (id, signal) => { let bytes = 0; return {
+      append: pcm => { signal.throwIfAborted(); bytes += pcm.length; },
+      commit: async clientId => { signal.throwIfAborted(); assert.equal(id, 'native'); assert.equal(bytes, 6400); input = clientId; submissions++; return { submissionId: 'accepted' }; },
+    }; },
     close: async () => {},
   };
   const config: BridgeConfig = { version: 1, listen: { host: '127.0.0.1', port: 0, allowLanPlaintext: true },

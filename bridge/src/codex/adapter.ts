@@ -1,16 +1,24 @@
 import { CodexRpc } from './rpc.ts';
-import { transcribeNative } from './voice.ts';
+import { transcribeNative, drainVoiceCleanup } from './voice.ts';
+import { PcmStream } from '../audio-stream.ts';
 import type { AgentAdapter, BridgeConfig, Reply, Session } from '../contracts.ts';
 import type { MediaHost } from '../host/contracts.ts';
 
 export class CodexAdapter implements AgentAdapter {
   readonly id = 'codex';
-  private rpc: CodexRpc;
+  private rpc: Pick<CodexRpc, 'initialize' | 'request' | 'close'>;
   private config: BridgeConfig['codex'];
   private voiceBusy = false;
+  private voiceController?: AbortController;
+  private voiceTask?: Promise<string>;
   private mediaHost: MediaHost;
+  private transcribe: typeof transcribeNative;
   private submitted = new Map<string, { sessionId: string; text: string }>();
-  constructor(config: BridgeConfig['codex'], mediaHost: MediaHost) { this.config = config; this.mediaHost = mediaHost; this.rpc = new CodexRpc(config.bin); }
+  constructor(config: BridgeConfig['codex'], mediaHost: MediaHost,
+    runtime?: { rpc: Pick<CodexRpc, 'initialize' | 'request' | 'close'>; transcribe: typeof transcribeNative }) {
+    this.config = config; this.mediaHost = mediaHost;
+    this.rpc = runtime?.rpc ?? new CodexRpc(config.bin); this.transcribe = runtime?.transcribe ?? transcribeNative;
+  }
   async initialize() { await this.rpc.initialize(); }
   private allowed(id: string) { if (!this.config.sessions.some(s => s.id === id)) throw Error('session_not_allowed'); }
   async sessions(): Promise<Session[]> {
@@ -32,22 +40,37 @@ export class CodexAdapter implements AgentAdapter {
         text: turn.items.filter((item: any) => item.type === 'agentMessage' && item.phase === 'final_answer').map((item: any) => item.text).join('\n\n') };
     }).filter((reply: Reply) => reply.text.length > 0).reverse();
   }
-  async submitAudio(sessionId: string, pcm: Buffer, inputId: string, signal: AbortSignal, progress: (state: string) => void) {
-    this.allowed(sessionId); if (this.voiceBusy) throw Error('bridge_busy'); this.voiceBusy = true;
-    try {
-      progress('recognizing');
-      const text = await transcribeNative(this.config.bin, this.mediaHost, pcm, signal);
-      signal.throwIfAborted(); progress('submitting');
-      if (this.submitted.size >= 32) this.submitted.delete(this.submitted.keys().next().value!);
-      this.submitted.set(inputId, { sessionId, text });
-      // Queue belongs to Codex and retains the desktop's original thread writer.
-      // Once this call starts, a connection loss cannot prove non-acceptance.
-      let result;
-      try { result = await this.rpc.request('thread/queue/add', { threadId: sessionId, clientUserMessageId: inputId, input: [{ type: 'text', text }] }); }
-      catch { throw Error('submission_unknown'); }
-      if (!result.queuedSubmission?.id) throw Error('submission_unknown');
-      return { submissionId: result.queuedSubmission.id as string };
-    } finally { this.voiceBusy = false; }
+  beginAudio(sessionId: string, signal: AbortSignal, onFailure: (error: unknown) => void = () => {}) {
+    this.allowed(sessionId); signal.throwIfAborted();
+    if (this.voiceBusy) throw Error('bridge_busy'); this.voiceBusy = true;
+    const input = new PcmStream(), controller = new AbortController();
+    const abort = () => controller.abort(); signal.addEventListener('abort', abort, { once: true });
+    this.voiceController = controller;
+    const transcript = this.transcribe(this.config.bin, this.mediaHost, input, controller.signal).finally(() => {
+      signal.removeEventListener('abort', abort); this.voiceBusy = false;
+      if (this.voiceController === controller) { this.voiceController = undefined; this.voiceTask = undefined; }
+    });
+    this.voiceTask = transcript; transcript.catch(onFailure);
+    let committed = false;
+    return {
+      append(pcm: Buffer) { input.append(pcm); },
+      commit: async (inputId: string, progress: (state: string) => void) => {
+        signal.throwIfAborted();
+        if (committed) throw Error('audio_closed'); committed = true;
+        input.end(); progress('recognizing');
+        const text = await transcript;
+        signal.throwIfAborted(); progress('submitting');
+        if (this.submitted.size >= 32) this.submitted.delete(this.submitted.keys().next().value!);
+        this.submitted.set(inputId, { sessionId, text });
+        // Exactly one queue mutation, after explicit commit and confirmed native
+        // session.closed. The desktop remains the original thread writer.
+        let result;
+        try { result = await this.rpc.request('thread/queue/add', { threadId: sessionId, clientUserMessageId: inputId, input: [{ type: 'text', text }] }); }
+        catch { throw Error('submission_unknown'); }
+        if (!result.queuedSubmission?.id) throw Error('submission_unknown');
+        return { submissionId: result.queuedSubmission.id as string };
+      },
+    };
   }
-  async close() { this.rpc.close(); }
+  async close() { this.voiceController?.abort(); await this.voiceTask?.catch(() => {}); await drainVoiceCleanup(); this.rpc.close(); }
 }

@@ -2,7 +2,8 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 
 export const PROTOCOL_VERSION = 1;
 export const RATE = 16000;
-export const MAX_AUDIO_BYTES = RATE * 2 * 30;
+export const MAX_RECORDING_SECONDS = 600;
+export const MAX_AUDIO_BYTES = RATE * 2 * MAX_RECORDING_SECONDS;
 export const MAX_FRAME_BYTES = 1292;
 export const MAX_TEXT_BYTES = 6144;
 export function authProof(secret: string, challenge: string): string {
@@ -17,7 +18,6 @@ export class AudioInput {
   readonly sessionId: string;
   private sequence = 0;
   private size = 0;
-  private frames: Buffer[] = [];
   constructor(id: number, sessionId: string) {
     if (!Number.isInteger(id) || id < 1 || id > 0xffffffff) throw Error('invalid_input');
     this.id = id; this.sessionId = sessionId;
@@ -27,11 +27,11 @@ export class AudioInput {
         frame.toString('ascii', 0, 4) !== 'MTA1' || frame.readUInt32LE(4) !== this.id ||
         frame.readUInt32LE(8) !== this.sequence) throw Error('invalid_audio_frame');
     if (this.size + frame.length - 12 > MAX_AUDIO_BYTES) throw Error('audio_limit');
-    this.sequence++; this.size += frame.length - 12; this.frames.push(Buffer.from(frame.subarray(12)));
+    this.sequence++; this.size += frame.length - 12;
+    return frame.subarray(12);
   }
-  finish(frames: unknown): Buffer {
+  finish(frames: unknown): void {
     if (frames !== this.sequence || this.size < RATE / 5) throw Error('incomplete_audio');
-    return Buffer.concat(this.frames, this.size);
   }
 }
 export function truncateUtf8(text: string, maxBytes = MAX_TEXT_BYTES): string {

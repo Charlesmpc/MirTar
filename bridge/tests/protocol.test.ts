@@ -11,11 +11,11 @@ test('binding proof is tied to the challenge; malformed and replayed proofs fail
 test('audio rejects wrong input IDs, missing frames and duplicates before commit', () => {
   const input = new AudioInput(12, 'native-session');
   const frame = Buffer.alloc(652); frame.write('MTA1'); frame.writeUInt32LE(12, 4);
-  input.append(frame);
+  assert.equal(input.append(frame).length, 640);
   assert.throws(() => input.append(frame), /invalid_audio_frame/);
   assert.throws(() => input.finish(3), /incomplete_audio/);
   for (let i = 1; i < 5; i++) { frame.writeUInt32LE(i, 8); input.append(frame); }
-  assert.equal(input.finish(5).length, 3200);
+  assert.doesNotThrow(() => input.finish(5));
 });
 test('UTF-8 reply truncation retains complete Chinese and supplementary characters', () => {
   assert.equal(truncateUtf8('中文🙂abc', 7), '中文');

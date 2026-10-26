@@ -305,7 +305,7 @@ static void audio_worker(void *arg) {
         if (bsp_audio_wake() != ESP_OK) failed = true;
         int64_t start = esp_timer_get_time();
         while (atomic_load(&audio_running) && !failed) {
-            if (esp_timer_get_time() - start >= 30000000) { failed = true; break; }
+            if (esp_timer_get_time() - start >= 600000000) { failed = true; break; }
             if (bsp_audio_read(frame + 12, 640) != ESP_OK) { failed = true; break; }
             if (!atomic_load(&audio_running)) break;
             memcpy(frame, "MTA1", 4); write_le32(frame + 4, current_id); write_le32(frame + 8, sequence);
@@ -393,9 +393,9 @@ static void handle_json(const char *data) {
             if (cJSON_IsNumber(id) && (uint32_t)id->valuedouble == recording_id) { state.submitting = false; submitted_session[0] = 0; }
         }
         if (strcmp(str(o, "sessionId"), state.sessions[state.selected].id)) { cJSON_Delete(o); return; }
-        if (!strcmp(value, "recognizing")) { status("原生语音识别中"); render("语音已发送\n\n等待 Codex 原生语音处理"); }
-        else if (!strcmp(value, "submitting")) { status("正在提交到会话"); render(NULL); }
-        else if (!strcmp(value, "accepted")) { status("已接受，等待回复"); render(NULL); }
+        if (!strcmp(value, "recognizing")) { status("正在完成语音识别"); render("录音已结束\n\n等待最后一段识别完成"); }
+        else if (!strcmp(value, "submitting")) { status("正在提交到会话"); render("语音识别完成\n\n正在提交到 Codex 会话"); }
+        else if (!strcmp(value, "accepted")) { status("已接受，等待回复"); render("Codex 已接受消息\n\n等待任务执行与回复"); }
         else if (!strcmp(value, "submission_unknown")) { state.submitting = true; status("提交状态未知"); render("请在电脑上确认\n\n不会自动重发录音"); }
     } else if (!strcmp(type, "error")) {
         const char *session_id = str(o, "sessionId");
@@ -559,7 +559,7 @@ void app_main(void) {
             case EV_AUDIO_DONE:
                 if ((uint32_t)event.key != recording_id) break;
                 state.recording = false;
-                if (!event.action && state.page == MT_READING) { state.submitting = false; status("录音未提交"); render("录音失败或已取消\n\n单次最多 30 秒\n按 OK 重新录音"); }
+                if (!event.action && state.page == MT_READING) { state.submitting = false; status("录音未提交"); render("录音失败或已取消\n\n单次最多 10 分钟\n按 OK 重新录音"); }
                 break;
             }
             free(event.json);
