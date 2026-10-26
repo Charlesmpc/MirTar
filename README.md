@@ -4,9 +4,20 @@
 
 [简体中文](README.zh-CN.md) · [Releases](https://github.com/Charlesmpc/MirTar/releases) · [Setup](docs/server-onboarding.md)
 
-<p align="center"><img src="docs/images/mirtar-cover.png" width="440" alt="MirTar concept illustration: a voice conversation connects a handheld interface to a laptop"></p>
+<p align="center"><a href="https://github.com/Charlesmpc/MirTar/releases/download/v0.5.2/MirTar-bluetooth-demo-v0.5.2.mp4"><img src="docs/images/mirtar-bluetooth-demo.gif" width="680" alt="Real MirTar Bluetooth demo: choose a computer, pair, speak and receive a reply"></a></p>
+
+<p align="center"><a href="https://github.com/Charlesmpc/MirTar/releases/download/v0.5.2/MirTar-bluetooth-demo-v0.5.2.mp4">Watch the Bluetooth demo (26 seconds)</a> · <a href="https://github.com/Charlesmpc/MirTar/releases/download/v0.5.2/MirTar-bluetooth-demo-v0.5.2-no-music.mp4">Without background music</a> · <a href="docs/demos/bluetooth-v0.5.2.md">Demo details</a></p>
+
+*Real badge footage. Preview plays at 4×; the full video labels shortened pairing and processing waits. Personal labels and the pairing code are hidden.*
+
+<details>
+<summary>Concept illustration</summary>
+
+<p align="center"><img src="docs/images/mirtar-cover.png" width="360" alt="MirTar concept illustration: a voice conversation connects a handheld interface to a laptop"></p>
 
 *Concept illustration; not a photograph or screenshot of the badge.*
+
+</details>
 
 MirTar turns a FoloToy AI Passport badge into a handheld controller and reply
 screen for the coding agent on your computer. Sit back, press OK, speak, then

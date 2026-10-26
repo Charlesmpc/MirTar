@@ -4,9 +4,20 @@
 
 [English](README.md) · [版本下载](https://github.com/Charlesmpc/MirTar/releases) · [使用说明](docs/server-onboarding.zh_CN.md)
 
-<p align="center"><img src="docs/images/mirtar-cover.png" width="440" alt="MirTar 概念示意图：手持语音界面与笔记本中的同一会话相连"></p>
+<p align="center"><a href="https://github.com/Charlesmpc/MirTar/releases/download/v0.5.2/MirTar-bluetooth-demo-v0.5.2.mp4"><img src="docs/images/mirtar-bluetooth-demo.gif" width="680" alt="MirTar 蓝牙实机演示：选择电脑、配对、说话、查看回复"></a></p>
+
+<p align="center"><a href="https://github.com/Charlesmpc/MirTar/releases/download/v0.5.2/MirTar-bluetooth-demo-v0.5.2.mp4">观看蓝牙 Demo（26 秒）</a> · <a href="https://github.com/Charlesmpc/MirTar/releases/download/v0.5.2/MirTar-bluetooth-demo-v0.5.2-no-music.mp4">无配乐版</a> · <a href="docs/demos/bluetooth-v0.5.2.md">演示说明</a></p>
+
+*真实卡片录像。动图为 4 倍速预览；完整视频分别标注缩短的配对与处理等待。个人标识和配对码已遮挡。*
+
+<details>
+<summary>概念示意图</summary>
+
+<p align="center"><img src="docs/images/mirtar-cover.png" width="360" alt="MirTar 概念示意图：手持语音界面与笔记本中的同一会话相连"></p>
 
 *概念示意图，并非卡片实拍或界面截图。*
+
+</details>
 
 MirTar 把 FoloToy AI Passport 卡片变成**电脑上编程 Agent 的随身控制器和回复屏幕**。
 不用戴耳机或一直凑到电脑麦克风前：按 OK 说话，再按 OK 发送，在卡片上阅读回复；

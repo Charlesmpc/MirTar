@@ -25,7 +25,7 @@ Recognition tests use synthetic speech and temporary read-only voice threads. Th
 | Firmware host tests | PASS: configuration/menu guards and server-scoped bond storage |
 | ESP-IDF 5.5.6 public firmware build | PASS; merged image 2,811,888 bytes, empty NVS, zero known credential/personal byte matches; no device flash performed |
 | Actual mid-stream native cancellation | PASS: cancelled after media connection; clean `input_cancelled`, no HTTP-header crash and no queue submission |
-| Physical badge acceptance of v0.5.2 | Not performed; v0.5.1 owner acceptance does not validate the new release |
+| Physical badge evidence for v0.5.2 | Owner-provided 2026-10-26 footage shows Bluetooth pairing, short voice capture, processing states and reply display on the badge; see the [edited demo](../demos/bluetooth-v0.5.2.md). Continuous ten-minute capture on the physical badge and broader radio/battery coverage remain unverified |
 
 Earlier development runs exposed a cancellation path that attempted to write HTTP headers twice. That path is fixed and covered by real native cancellation and fixture HTTP regression checks. The complete sequential 600-second run above is the long-run release evidence.
 
