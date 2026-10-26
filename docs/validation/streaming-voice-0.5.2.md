@@ -20,12 +20,14 @@ Recognition tests use synthetic speech and temporary read-only voice threads. Th
 | Explicit native graceful-close protocol | PASS: WebRTC v3 accepted `session.close` and returned `session.closed`, reason `client_request` |
 | Real-time 26.929-second stream | PASS: connected at 13.787 s; first transcript at 19.058 s (before commit at 26.986 s); all audio drained at 42.729 s; close acknowledged at 43.423 s; 408 user transcript characters and both spoken ending markers present |
 | Same test, including then-blocking browser cleanup | Returned at 49.857 s, versus about 98.1 s for the previous buffered-replay implementation; cleanup was subsequently moved off the submission path |
-| Full 600-second native streaming run | In progress; see final release receipt before publishing |
+| Full 600-second native streaming run | PASS: 600.004 s capture; connected at 12.055 s; first transcript at 15.174 s; exact sample drain at 614.058 s; normal native close at 615.146 s; function returned at 615.161 s (15.157 s after commit). All 20 spoken verification markers retained, 1,835 transcript characters, peak Node-side pending PCM 385,920 bytes |
 | TypeScript and bridge regression tests | 29 PASS; includes ten-minute validator/worklet wraparound, backpressure, final marker ordering, abnormal/early close, explicit commit, cancel and no replay |
 | Firmware host tests | PASS: configuration/menu guards and server-scoped bond storage |
 | ESP-IDF 5.5.6 public firmware build | PASS; merged image 2,811,888 bytes, empty NVS, zero known credential/personal byte matches; no device flash performed |
 | Actual mid-stream native cancellation | PASS: cancelled after media connection; clean `input_cancelled`, no HTTP-header crash and no queue submission |
 | Physical badge acceptance of v0.5.2 | Not performed; v0.5.1 owner acceptance does not validate the new release |
+
+Earlier development runs exposed a cancellation path that attempted to write HTTP headers twice. That path is fixed and covered by real native cancellation and fixture HTTP regression checks. The complete sequential 600-second run above is the long-run release evidence.
 
 The first connection still has measurable setup cost. Long-running native recognition and network conditions affect tail latency; no fixed few-second completion guarantee is made.
 
