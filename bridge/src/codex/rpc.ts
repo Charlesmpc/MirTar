@@ -30,7 +30,7 @@ export class CodexRpc extends EventEmitter {
     this.pending.clear(); this.emit('unavailable');
   }
   async initialize() {
-    await this.request('initialize', { clientInfo: { name: 'mirtar_bridge', version: '0.5.2' }, capabilities: { experimentalApi: true } });
+    await this.request('initialize', { clientInfo: { name: 'mirtar_bridge', version: '0.5.3' }, capabilities: { experimentalApi: true } });
     this.child.stdin.write(JSON.stringify({ method: 'initialized', params: {} }) + '\n');
   }
   request(method: string, params: unknown = {}, timeoutMs = 20000): Promise<any> {

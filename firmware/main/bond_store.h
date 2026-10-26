@@ -8,5 +8,7 @@
 esp_err_t mt_bond_prepare(const char *server_id, uint8_t address[6]);
 esp_err_t mt_bond_promote(const char *server_id);
 esp_err_t mt_bond_reset(const char *server_id);
+/* Radio/host must be stopped. Idempotently erase identity and BOTH generations. */
+esp_err_t mt_bond_forget(const char *server_id);
 bool mt_bond_matches(const char *server_id);
 bool mt_bond_namespace(const char *server_id, char output[16]);

@@ -1,6 +1,6 @@
 # Server onboarding (development build)
 
-This branch starts from v0.3.1, retaining the reading skin and Codex voice path. Its version is `0.5.1`.
+The development version is `0.5.3`; the published stable version is `0.5.2`. The reading skin and Codex voice path remain.
 The public v0.5.1 image was submitted for community review on 2026-10-25 (project 1619, revision 3705).
 Its submission receipt was pending. The owner subsequently confirmed successful device validation on 2026-10-25;
 community review status is separate from hardware validation.
@@ -8,6 +8,22 @@ community review status is separate from hardware validation.
 The home screen has **Server list** when hosts exist, plus **Add server** and **Add config-file**.
 Server list opens saved hosts; Bluetooth is the default transport.
 Hold OK to cancel and return home. Successful additions/imports also return home.
+Once deletion is confirmed, an incomplete deletion must finish before reconnecting.
+
+## Delete server (0.5.3 development)
+
+Choose **Server list → computer → Delete server**. Cancel is selected first. Use UP/DOWN to
+select Delete all connections, then OK to confirm. Cancel or holding OK before confirmation changes nothing.
+
+This removes that entire `server.id`: name, application binding key, Wi-Fi network and bridge address,
+plus the badge's Bluetooth identity, bond keys and subscription state. Other hosts, card identity and skin remain.
+The card returns home; deleting the last host leaves Add server / Add config-file. Hosts can be added again.
+
+On failure, connections stay stopped. Press OK to retry; a durable deletion intent resumes on reboot.
+This manages badge storage only, leaving the computer's config-file, Windows pairings and Codex sessions intact.
+Reimporting an old file adds its hosts again; Bluetooth re-addition creates a new pairing identity.
+Upgrade while preserving NVS; a complete personal preset image may bring old hosts back.
+See [implementation and validation scope](validation/delete-server-0.5.3.md).
 
 ## Add server: Bluetooth only
 
@@ -27,7 +43,7 @@ The enrollment tool does not initialize the Agent or submit tasks. It saves a ra
 over authenticated/encrypted BLE. The card acknowledges only after saving. A cancelled or uncertain exchange may retain
 an unused computer-side device entry for retry; keys and Bluetooth bonds are not silently erased or rotated.
 The stable server ID survives display-name changes. Existing bridge processes need restarting to load new bindings.
-With four hosts saved, update an existing entry through a file instead.
+With four hosts saved, delete an unused host first, or update an existing entry through a file.
 
 ## Bluetooth recovery after one minute
 
@@ -94,8 +110,8 @@ Compiled v0.3.1 config and v0.4.0's old NVS format are not automatically migrate
 ## Build and validation
 
 Run `npm.cmd run check`, `npm.cmd test`, and `npm.cmd run test:portal`.
-Firmware builds use PowerShell 7 with ESP-IDF 5.5.6: `.\tools\Build-Firmware.ps1`.
-The merged output is `.private/build-v0.5.1/MirTar-full.bin`, flashed at **0x0**.
+Firmware builds use ESP-IDF 5.5.6: `.\tools\Build-Firmware.ps1`. Windows PowerShell can start the build helper.
+The current development merged output is `.private/build-v0.5.3/MirTar-full.bin`, flashed at **0x0**.
 With a compatible partition layout, segmented `Flash-Firmware.ps1 -Port COMx -PreserveNvs` preserves NVS;
 add `-WhatIf` for a device-free preview. Preserve original files and verified firmware first.
 No automatic flashing is authorized. Public builds never contain actual credentials; their `-Config` is disabled.

@@ -1,6 +1,6 @@
 {
   "name": "mirtar",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "private": true,
   "type": "module",
   "engines": {
@@ -18,7 +18,8 @@
     "device": "node tools/device-simulator.ts",
     "test:portal": "node --test tools/portal.test.mjs",
     "test:firmware": "python tools/test-firmware.py",
-    "test:bonds": "python tools/test-bonds.py"
+    "test:bonds": "python tools/test-bonds.py",
+    "test:server-delete": "python tools/test-server-delete.py"
   },
   "dependencies": {
     "ws": "8.18.3"

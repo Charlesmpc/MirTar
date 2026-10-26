@@ -1,6 +1,6 @@
 # 主机添加与配置导入（开发版）
 
-本分支从 v0.3.1 重新开发，版本标识为 `0.5.1`。保留专注阅读皮肤与 Codex 语音链路。
+当前开发版本为 `0.5.3`，已发布稳定版为 `0.5.2`。保留专注阅读皮肤与 Codex 语音链路。
 v0.5.1 公版已于 2026-10-25 提交社区审核（项目 1619，版本记录 3705），回执为待审核。
 作者随后于 2026-10-25 确认 v0.5.1 实机验证通过；社区审核与硬件验证是独立状态。
 
@@ -13,6 +13,22 @@ v0.5.1 公版已于 2026-10-25 提交社区审核（项目 1619，版本记录 3
 3. **Add config-file**：主动开启卡片热点，上传准备好的设备配置。不会因连接失败自动打开。
 
 长按 OK 取消当前操作并回首页。添加或导入成功后也回首页，再从 Server list 连接。
+删除已确认且尚未完成时须先重试完成删除，避免连接半删除的主机。
+
+## Delete server：删除这台主机（0.5.3 开发版）
+
+Server list → 选择电脑 → **Delete server**。确认页默认选“取消”，上下切到
+“删除全部连接”后按 OK 才执行；取消或长按 OK 不删除记录。
+
+删除的是这一个 `server.id` 的完整对象：名称、应用绑定密钥、Wi-Fi 网络及电脑地址，
+以及它在卡片上的蓝牙身份、配对密钥和通知订阅记录。其他主机、卡片身份和皮肤保留。
+删除后回首页，删掉最后一台时只剩 Add server / Add config-file；可重新添加电脑。
+
+删除失败时保持断开，按 OK 重试；已保存的删除意图会在重启时继续执行。
+这只管理卡片存储，不删除电脑上的配置文件、Windows 配对记录或 Codex 会话。
+旧文件再次导入会重新添加其中的主机；重新添加蓝牙时会使用新身份配对。
+升级建议仅刷应用或保留 NVS；完整个人预置镜像可能重新带回旧主机。
+见[实现与验证范围](validation/delete-server-0.5.3.md)。
 
 ## Add server：蓝牙添加
 
@@ -112,13 +128,13 @@ Wi-Fi 电脑需在可信专用网络放行所配置的 TCP 端口，默认 28743
 npm.cmd run check
 npm.cmd test
 npm.cmd run test:portal
-# 构建助手需 PowerShell 7；配置／添加工具支持 Windows PowerShell 5.1：
+# 可用 Windows PowerShell 启动；SDK 激活失败时按工具链提示处理：
 .\tools\Build-Firmware.ps1
 # 仅预览，不接触设备：
 .\tools\Flash-Firmware.ps1 -Port COMx -PreserveNvs -WhatIf
 ```
 
-默认固件在 `.private/build-v0.5.1/MirTar-full.bin`，完整镜像从 **0x0** 刷入。
+当前开发固件在 `.private/build-v0.5.3/MirTar-full.bin`，完整镜像从 **0x0** 刷入。
 原分区兼容时用 `-PreserveNvs` 分段刷写；完整镜像会影响已有配置，刷前保留旧文件和已验证固件。
 未经用户明确授权，不自动刷机。公开构建不读取实际配置；个人预置请使用独立的
 `Build-PersonalFirmware.ps1`，见[构建与发布隔离](build-variants.zh_CN.md)。公开构建的 `-Config` 参数禁用。

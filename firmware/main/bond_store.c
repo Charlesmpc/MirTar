@@ -139,3 +139,26 @@ esp_err_t mt_bond_reset(const char *id) {
     if(rc==ESP_OK){char old_space[16];bank_namespace(space,old.bank,old_space);rc=erase_bank(old_space);}
     return rc;
 }
+static esp_err_t erase_existing(const char *space) {
+    nvs_handle_t handle;esp_err_t rc=nvs_open(space,NVS_READONLY,&handle);
+    if(rc==ESP_ERR_NVS_NOT_FOUND)return ESP_OK;
+    if(rc!=ESP_OK)return rc;
+    nvs_close(handle);return erase_bank(space);
+}
+esp_err_t mt_bond_forget(const char *id) {
+    char root[16];if(!mt_bond_namespace(id,root))return ESP_ERR_INVALID_ARG;
+    // Check the full owner before touching any hashed namespace. Missing metadata
+    // is allowed on retries after the final erase, but a different owner is not.
+    nvs_handle_t handle;esp_err_t rc=nvs_open(root,NVS_READONLY,&handle);
+    if(rc==ESP_OK){profile_t p;rc=read_profile(handle,&p,id);nvs_close(handle);}
+    if(rc!=ESP_OK&&rc!=ESP_ERR_NVS_NOT_FOUND)return rc;
+    for(unsigned bank=0;bank<2;bank++){
+        char space[16];bank_namespace(root,bank,space);rc=erase_existing(space);if(rc!=ESP_OK)return rc;
+    }
+    // Enrollment staging is temporary, not any saved host's authoritative store.
+    // With the host stopped no live enrollment can own it. Remove copied secrets.
+    rc=erase_existing(STAGING);if(rc!=ESP_OK)return rc;
+    rc=erase_existing(root);if(rc!=ESP_OK)return rc;
+    if(staging||mt_bond_matches(id)){memset(active_namespace,0,sizeof(active_namespace));memset(active_server,0,sizeof(active_server));staging=false;}
+    return ESP_OK;
+}

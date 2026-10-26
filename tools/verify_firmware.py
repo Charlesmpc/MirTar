@@ -34,6 +34,9 @@ if tuple(map(int,manifest['version'].split('.')[:3])) >= (0,5,1):
         names={s.name for s in symbols.iter_symbols()} if symbols else set()
     assert {'mt_bond_prepare','mt_bond_reset','__wrap_nvs_open'}.issubset(names), 'This release requires actual server-scoped Bluetooth storage code'
     manifest.update(bluetoothStorageSchema=1,bluetoothResetScope='server',bluetoothPerServerIdentity=True)
+    if tuple(map(int,manifest['version'].split('.')[:3])) >= (0,5,3):
+        assert {'mt_server_delete','mt_server_delete_recover','mt_bond_forget'}.issubset(names), 'Server deletion and boot recovery must be linked'
+        manifest.update(serverDeleteScope='server',serverDeleteRecovery=True)
 numbers = re.match(r'(\d+)\.(\d+)', project.get('project_version', ''))
 assert numbers and tuple(map(int, numbers.groups())) >= (0, 4), 'Use the matching pre-provisioning verifier for old images'
 manifest['templateConfiguration'] = False

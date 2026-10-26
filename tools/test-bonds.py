@@ -11,7 +11,7 @@ command=[compiler] if compiler else [str(root/'.private/host-compiler/ziglang/zi
 environment={**os.environ,'ZIG_GLOBAL_CACHE_DIR':str(output/'zig-global'),'ZIG_LOCAL_CACHE_DIR':str(output/'zig-local'),'TMP':str(output/'temp'),'TEMP':str(output/'temp')}
 (output/'temp').mkdir(exist_ok=True)
 executable=output/('bond-tests.exe' if os.name=='nt' else 'bond-tests')
-subprocess.run(command+['-std=c11','-Wall','-Wextra','-Werror','-I'+str(root/'firmware/tests/bond_stubs'),'-I'+str(root/'firmware/main'),str(root/'firmware/main/bond_store.c'),str(root/'firmware/tests/bond_store_test.c'),'-o',str(executable)],env=environment,check=True)
+subprocess.run(command+['-std=c11','-Wall','-Wextra','-Werror','-I'+str(root/'firmware/tests/bond_stubs'),'-I'+str(root/'firmware/main'),str(root/'firmware/main/bond_store.c'),str(root/'firmware/tests/bond_store_test.c'),str(root/'firmware/tests/bond_stubs/nvs_memory.c'),'-o',str(executable)],env=environment,check=True)
 receipt=output/'bond-tests.receipt.txt';receipt.unlink(missing_ok=True)
 subprocess.run([str(executable),str(receipt)],check=True)
 if not receipt.is_file() or not receipt.read_text().startswith('PASS:'):raise SystemExit('Bond test result unverified')

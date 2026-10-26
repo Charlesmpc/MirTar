@@ -131,3 +131,14 @@ cJSON *mt_config_enroll(const cJSON *base,const cJSON *server) {
     cJSON_AddItemToArray(list,copy);cJSON_ReplaceItemInObjectCaseSensitive(incoming,"servers",list);
     cJSON *result=mt_config_import(base,incoming);cJSON_Delete(incoming);return result;
 }
+cJSON *mt_config_remove_server(const cJSON *base,const char *id) {
+    if(!mt_config_valid(base)||!identifier(id,40))return NULL;
+    const cJSON *servers=cJSON_GetObjectItemCaseSensitive(base,"servers");
+    int index=-1;
+    for(int i=0;i<cJSON_GetArraySize(servers);i++)
+        if(!strcmp(field(cJSON_GetArrayItem(servers,i),"id"),id)){index=i;break;}
+    if(index<0)return NULL;
+    cJSON *copy=cJSON_Duplicate(base,true);if(!copy)return NULL;
+    cJSON_DeleteItemFromArray(cJSON_GetObjectItemCaseSensitive(copy,"servers"),index);
+    if(!mt_config_valid(copy)){cJSON_Delete(copy);return NULL;}return copy;
+}

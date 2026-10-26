@@ -41,6 +41,15 @@ int main(int argc,char **argv){
     cJSON_DeleteItemFromObjectCaseSensitive(base,"buildFlavor");
     cJSON *first=with_server("OfficeLaptop","OfficeNetwork"),*second=with_server("HomeLaptop","HomeNetwork");
     cJSON *both=mt_config_import(first,second);assert(both);
+    cJSON *removed=mt_config_remove_server(both,"HomeLaptop");assert(removed);
+    assert(cJSON_GetArraySize(cJSON_GetObjectItem(removed,"servers"))==1);
+    assert(cJSON_GetArraySize(cJSON_GetObjectItem(both,"servers"))==2);
+    assert(!strcmp(text(mt_config_server_wifi(removed,0),"ssid"),"OfficeNetwork"));
+    assert(!strcmp(text(removed,"deviceId"),text(both,"deviceId"))&&!strcmp(text(removed,"skin"),text(both,"skin")));
+    cJSON *last_removed=mt_config_remove_server(removed,"OfficeLaptop");assert(last_removed&&mt_config_valid(last_removed));
+    assert(cJSON_GetArraySize(cJSON_GetObjectItem(last_removed,"servers"))==0);
+    assert(!mt_config_remove_server(both,"missing")&&!mt_config_remove_server(both,"bad id")&&!mt_config_remove_server(NULL,"HomeLaptop"));
+    cJSON_Delete(last_removed);cJSON_Delete(removed);
     assert(!strcmp(text(mt_config_server_wifi(both,0),"ssid"),"OfficeNetwork"));
     assert(!strcmp(text(mt_config_server_wifi(both,1),"ssid"),"HomeNetwork"));assert(!mt_config_server_wifi(both,2));
     cJSON *offer_config=with_server("HomeLaptop",NULL),*offer=cJSON_GetArrayItem(cJSON_GetObjectItem(offer_config,"servers"),0);
@@ -69,7 +78,8 @@ int main(int argc,char **argv){
     char *raw=cJSON_PrintUnformatted(second);char duplicated[MT_CONFIG_LIMIT+1];snprintf(duplicated,sizeof(duplicated),"%.*s,\"version\":2}",(int)strlen(raw)-1,raw);free(raw);
     cJSON *duplicate=mt_config_parse(duplicated,strlen(duplicated)+1);assert(duplicate&&!mt_config_valid(duplicate));cJSON_Delete(duplicate);
     mt_state_t state={.page=MT_HOME,.connected=true,.bound=true,.session_count=1};assert(!mt_can_record(&state));
-    state.page=MT_PAIR_CONFIRM;assert(!mt_can_record(&state));state.page=MT_READING;assert(mt_can_record(&state));state.submitting=true;assert(!mt_can_record(&state));mt_disconnect(&state);assert(!mt_can_record(&state));
+    state.page=MT_PAIR_CONFIRM;assert(!mt_can_record(&state));state.page=MT_DELETE_CONFIRM;assert(!mt_can_record(&state));
+    state.page=MT_DELETE_PENDING;assert(!mt_can_record(&state));state.page=MT_READING;assert(mt_can_record(&state));state.submitting=true;assert(!mt_can_record(&state));mt_disconnect(&state);assert(!mt_can_record(&state));
     /* Fast disconnect/retry loops must not postpone the one-minute recovery entry. */
     state=(mt_state_t){.page=MT_CONNECTING,.transport=MT_BLUETOOTH};
     mt_ble_wait_start(&state,1000);assert(!mt_ble_wait_update(&state,60000999));assert(!mt_ble_can_offer_reset(&state));

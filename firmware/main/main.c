@@ -26,6 +26,7 @@
 #include "runtime_config.h"
 #include "wifi_portal.h"
 #include "ble_transport.h"
+#include "server_delete.h"
 
 typedef enum { EV_KEY, EV_WIFI_ON, EV_WIFI_OFF, EV_WS_ON, EV_WS_OFF, EV_JSON, EV_AUDIO_DONE, EV_BLE_PIN, EV_CONFIG } event_kind_t;
 typedef struct { event_kind_t kind; int key, action; uint32_t generation; char *json; } event_t;
@@ -61,6 +62,9 @@ static char *pending_config;
 static int64_t config_apply_at, portal_close_at, pair_deadline, pair_close_at, wifi_deadline;
 static char pair_nonce[33], pair_server_id[41];
 static bool pair_finished, reset_confirm_yes, reset_done;
+static int transport_index;
+static bool delete_confirm_yes;
+static char pending_delete_id[41];
 static void show_home(void);
 static void read_settings(void);
 static void enter_pairing(void);
@@ -125,9 +129,15 @@ static void show_machines(void) {
 }
 static void show_transports(void) {
     char body[300];
-    snprintf(body, sizeof(body), "%s\n\n连接方式\n\n%s Bluetooth\n\n%s Wi-Fi\n\n蓝牙首次连接需要配对", targets[target_index].name,
-        state.transport == MT_BLUETOOTH ? ">" : " ", state.transport == MT_WIFI ? ">" : " ");
-    state.page = MT_TRANSPORT; status("上下选择  OK 连接"); render(body);
+    snprintf(body, sizeof(body), "%s\n\n%s Bluetooth\n\n%s Wi-Fi\n\n%s Delete server", targets[target_index].name,
+        transport_index==0?">":" ",transport_index==1?">":" ",transport_index==2?">":" ");
+    state.page = MT_TRANSPORT; status("上下选择  OK 确认"); render(body);
+}
+static void show_delete_confirm(void) {
+    char body[340];
+    snprintf(body,sizeof(body),"删除主机？\n%s\nWi-Fi、蓝牙和绑定均删除\n\n%s 取消\n\n%s 删除全部连接",
+        targets[target_index].name,delete_confirm_yes?" ":">",delete_confirm_yes?">":" ");
+    state.page=MT_DELETE_CONFIRM;status("上下选择  OK 确认");render(body);
 }
 static void stop_audio(void) {
     atomic_store(&audio_submit, false); atomic_store(&audio_running, false);
@@ -193,7 +203,7 @@ static bool disconnect_target(void) {
     memset(pair_nonce,0,sizeof(pair_nonce));
     generation++;
     mt_ble_wait_clear(&state);
-    mt_ble_stop();
+    if(!mt_ble_stop()){status("蓝牙停止失败，请重启");render(NULL);return false;}
     if (websocket) { esp_websocket_client_stop(websocket); esp_websocket_client_destroy(websocket); websocket = NULL; }
     if (wifi_started) { wifi_started = false; esp_wifi_stop(); }
     if (wifi_initialized) {
@@ -205,6 +215,24 @@ static bool disconnect_target(void) {
     state.wifi = false; wifi_attempt_active = false; wifi_retry_at = wifi_attempt_deadline = 0;
     mt_disconnect(&state);
     return true;
+}
+static void finish_server_delete(bool retry) {
+    if(!retry)snprintf(pending_delete_id,sizeof(pending_delete_id),"%s",targets[target_index].id);
+    if(!disconnect_target()){if(retry)state.page=MT_DELETE_PENDING;return;}
+    manual_machine_selection=true;state.page=MT_DELETE_PENDING;
+    status("正在删除主机");render("正在保存删除结果");
+    esp_err_t result=pending_delete_id[0]?mt_server_delete(pending_delete_id):mt_server_delete_recover();
+    if(result==ESP_ERR_NOT_FOUND)result=mt_server_delete_recover();
+    cJSON *loaded=result==ESP_OK?mt_config_load():NULL;
+    if(!loaded){status("删除未完成  OK 重试");render("连接已停止\n\n按 OK 重试\n仍失败请重启卡片\n\n重启后检查删除结果");return;}
+    cJSON_Delete(device_config);device_config=loaded;read_settings();
+    memset(pending_delete_id,0,sizeof(pending_delete_id));
+    memset(wifi_networks,0,sizeof(wifi_networks));wifi_count=wifi_index=0;
+    memset(state.sessions,0,sizeof(state.sessions));state.session_count=state.selected=0;
+    memset(state.target_name,0,sizeof(state.target_name));state.submitting=false;
+    memset(reply,0,sizeof(reply));memset(pending_reply,0,sizeof(pending_reply));memset(submitted_session,0,sizeof(submitted_session));
+    state.transport=MT_BLUETOOTH;home_index=target_count?0:1;show_home();
+    status("主机及全部连接已删除");render(NULL);
 }
 static bool portal_submit(char *json) {
     event_t event={.kind=EV_CONFIG,.generation=generation,.json=json};
@@ -230,7 +258,7 @@ static void enter_config_upload(void) {
     if(bsp_lvgl_lock(300)){mt_ui_setup(mt_portal_ssid(),mt_portal_password());bsp_lvgl_unlock();}
 }
 static void enter_pairing(void) {
-    if(target_count>=4){status("主机已满，请用配置更新");render(NULL);return;}
+    if(target_count>=4){status("主机已满，请先删除主机");render(NULL);return;}
     if(!disconnect_target())return;
     manual_machine_selection=false;state.transport=MT_BLUETOOTH;state.page=MT_PAIRING;
     pair_deadline=esp_timer_get_time()+120000000;
@@ -412,11 +440,19 @@ static void handle_json(const char *data) {
     cJSON_Delete(o);
 }
 static void handle_key(int key, int action) {
+    if(state.page==MT_DELETE_PENDING){if(action==BSP_BTN_CLICK&&key==BSP_BTN_OK)finish_server_delete(true);return;}
     if (action == BSP_BTN_LONG && key == BSP_BTN_OK) {
         if (!disconnect_target()) return;
         manual_machine_selection=true;home_index=target_count?0:1;show_home();return;
     }
     if(state.page==MT_SETUP)return;
+    if(state.page==MT_DELETE_CONFIRM) {
+        if(action!=BSP_BTN_CLICK)return;
+        if(key!=BSP_BTN_OK){delete_confirm_yes=!delete_confirm_yes;show_delete_confirm();}
+        else if(delete_confirm_yes)finish_server_delete(false);
+        else show_transports();
+        return;
+    }
     if(state.page==MT_BLE_RESET_CONFIRM) {
         if(action!=BSP_BTN_CLICK)return;
         if(key!=BSP_BTN_OK){reset_confirm_yes=!reset_confirm_yes;show_ble_reset_confirm();}
@@ -457,11 +493,14 @@ static void handle_key(int key, int action) {
         else if(home_index==0){if(target_count)show_machines();else{status("暂无主机，请选择 Add server");render(NULL);}}
         else if(home_index==1)enter_pairing();else enter_config_upload();
     } else if (state.page == MT_MACHINES) {
-        if (key == BSP_BTN_OK) { state.transport = MT_BLUETOOTH; show_transports(); }
+        if (key == BSP_BTN_OK) { state.transport = MT_BLUETOOTH; transport_index=0;show_transports(); }
         else if (key != BSP_BTN_OK) { target_index = (target_index + target_count + direction) % target_count; show_machines(); }
     } else if (state.page == MT_TRANSPORT) {
-        if (key == BSP_BTN_OK) connect_target();
-        else { state.transport = state.transport == MT_BLUETOOTH ? MT_WIFI : MT_BLUETOOTH; show_transports(); }
+        if (key == BSP_BTN_OK) {
+            if(transport_index==2){delete_confirm_yes=false;show_delete_confirm();}
+            else{state.transport=transport_index==0?MT_BLUETOOTH:MT_WIFI;connect_target();}
+        }
+        else { transport_index=(transport_index+3+direction)%3;show_transports(); }
     } else if (state.page == MT_SESSIONS) {
         if (key == BSP_BTN_OK) choose_session();
         else { state.selected = (state.selected + state.session_count + direction) % state.session_count; show_sessions(); }
@@ -492,14 +531,16 @@ void app_main(void) {
     /* Never erase NVS to conceal a partition or schema mismatch. */
     if (nvs_flash_init() != ESP_OK) { status("NVS 初始化失败"); render("请检查固件分区配置"); return; }
     ESP_ERROR_CHECK(esp_netif_init()); ESP_ERROR_CHECK(esp_event_loop_create_default());
-    cJSON *loaded=mt_config_load();bool recovery=!loaded;
+    esp_err_t delete_recovery=mt_server_delete_recover();
+    cJSON *loaded=delete_recovery==ESP_OK?mt_config_load():NULL;bool recovery=!loaded;
     if(loaded){cJSON_Delete(device_config);device_config=loaded;}
     if(!strcmp(str(device_config,"deviceId"),"mirtar-new")) {
         char id[40];snprintf(id,sizeof(id),"mirtar-%08lX%08lX",(unsigned long)esp_random(),(unsigned long)esp_random());
         cJSON_ReplaceItemInObjectCaseSensitive(device_config,"deviceId",cJSON_CreateString(id));
     }
     read_settings();home_index=target_count?0:1;show_home();
-    if(recovery){status("旧配置需转换后重新导入");render(NULL);}
+    if(delete_recovery!=ESP_OK){state.page=MT_DELETE_PENDING;status("删除未完成  OK 重试");render("主机删除恢复失败\n\n按 OK 重试\n仍失败请重启卡片");}
+    else if(recovery){status("旧配置需转换后重新导入");render(NULL);}
     printf("MirTar startup: heap=%u largest=%u, microphone_idle=off\n", (unsigned)esp_get_free_heap_size(),
         (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
     int64_t last_render = 0;

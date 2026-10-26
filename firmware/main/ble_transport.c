@@ -134,7 +134,7 @@ static void host_sync(void) {
 static void host_task(void *arg) { (void)arg; nimble_port_run(); nimble_port_freertos_deinit(); }
 bool mt_ble_start(const char *server_id, const char *host_name, uint32_t generation, mt_ble_callback_t callback) {
     if (faulted) return false;
-    mt_ble_stop();
+    if(!mt_ble_stop())return false;
     if (initialized) return false;
     if (!host_name || !host_name[0] || strlen(host_name) > 20) return false;
     if (mt_bond_prepare(server_id,local_identity)!=ESP_OK) return false;
@@ -157,9 +157,9 @@ bool mt_ble_start(const char *server_id, const char *host_name, uint32_t generat
     } else advertise();
     return true;
 }
-void mt_ble_stop(void) {
+bool mt_ble_stop(void) {
     atomic_store(&enabled, false); atomic_store(&ready, false);
-    if (!initialized || faulted) return;
+    if (!initialized || faulted) return !initialized&&!faulted;
     ble_gap_adv_stop();
     unsigned conn = atomic_load(&connection);
     if (conn != BLE_HS_CONN_HANDLE_NONE) ble_gap_terminate(conn, BLE_ERR_REM_USER_CONN_TERM);
@@ -169,6 +169,7 @@ void mt_ble_stop(void) {
         atomic_store(&connection, BLE_HS_CONN_HANDLE_NONE);
         if (send_lock) { vSemaphoreDelete(send_lock); send_lock = NULL; }
     }
+    return !initialized;
 }
 bool mt_ble_assign_server(const char *server_id) {
     if(!initialized||faulted||!atomic_load(&ready)||!secure())return false;

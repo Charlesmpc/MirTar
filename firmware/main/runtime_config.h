@@ -13,3 +13,5 @@ esp_err_t mt_config_save(const cJSON *config);
 cJSON *mt_config_import(const cJSON *base, const cJSON *incoming);
 const cJSON *mt_config_server_wifi(const cJSON *config, int index);
 cJSON *mt_config_enroll(const cJSON *base, const cJSON *server);
+/* Pure copy: remove one whole server object, never mutate the source. */
+cJSON *mt_config_remove_server(const cJSON *base, const char *server_id);
