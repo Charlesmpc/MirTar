@@ -4,11 +4,11 @@
 
 [English](README.md) · [版本下载](https://github.com/Charlesmpc/MirTar/releases) · [使用说明](docs/server-onboarding.zh_CN.md)
 
-<p align="center"><a href="https://github.com/Charlesmpc/MirTar/releases/download/v0.5.2/MirTar-bluetooth-demo-v0.5.2.mp4"><img src="docs/images/mirtar-bluetooth-demo.gif" width="680" alt="MirTar 蓝牙实机演示：选择电脑、配对、说话、查看回复"></a></p>
+<p align="center"><a href="https://github.com/Charlesmpc/MirTar/releases/download/v0.5.2/MirTar-bluetooth-demo-v0.5.2.mp4"><img src="docs/images/mirtar-bluetooth-demo.gif?rev=2" width="680" alt="MirTar 蓝牙实机演示：选择电脑、配对、说话、查看回复"></a></p>
 
 <p align="center"><a href="https://github.com/Charlesmpc/MirTar/releases/download/v0.5.2/MirTar-bluetooth-demo-v0.5.2.mp4">观看蓝牙 Demo（26 秒）</a> · <a href="https://github.com/Charlesmpc/MirTar/releases/download/v0.5.2/MirTar-bluetooth-demo-v0.5.2-no-music.mp4">无配乐版</a> · <a href="docs/demos/bluetooth-v0.5.2.md">演示说明</a></p>
 
-*真实卡片录像。动图为 4 倍速预览；完整视频分别标注缩短的配对与处理等待。个人标识和配对码已遮挡。*
+*真实卡片录像。动图为 4 倍速预览；完整视频分别标注缩短的配对与处理等待。*
 
 <details>
 <summary>概念示意图</summary>
