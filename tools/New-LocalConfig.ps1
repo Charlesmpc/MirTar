@@ -1,10 +1,18 @@
 param([string]$SessionId, [string]$BridgeAddress, [ValidateRange(1024,65535)][int]$Port = 28743, [switch]$AddWiFi,
-    [ValidatePattern('^[a-zA-Z0-9_-]{1,20}$')][string]$BluetoothName = $env:COMPUTERNAME, [switch]$BluetoothOnly, [switch]$NoWiFiPrompt, [string]$CodexBin, [string]$Name, [string]$ServerId, [ValidatePattern('^[a-zA-Z0-9_-]{1,40}$')][string]$DeviceId = 'mirtar-card-1')
+    [ValidatePattern('^[a-zA-Z0-9_-]{1,20}$')][string]$BluetoothName = $env:COMPUTERNAME, [switch]$BluetoothOnly, [switch]$NoWiFiPrompt, [string]$CodexBin, [string]$Name, [string]$ServerId, [ValidatePattern('^[a-zA-Z0-9_-]{1,40}$')][string]$DeviceId = 'mirtar-card-1', [switch]$BridgeOwned, [string]$WorkingDirectory)
 $ErrorActionPreference = 'Stop'
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $privateDir = Join-Path $repoRoot '.private'
 $devicePath = Join-Path $privateDir 'device.config.json'
 $bridgePath = Join-Path $privateDir 'bridge.config.json'
+if($BridgeOwned){
+    if($AddWiFi -or $SessionId -or !$WorkingDirectory){throw 'BridgeOwned requires -WorkingDirectory and cannot be combined with AddWiFi or SessionId.'}
+    $WorkingDirectory=(Resolve-Path -LiteralPath $WorkingDirectory).Path
+    if(!(Test-Path -LiteralPath $WorkingDirectory -PathType Container)){throw 'WorkingDirectory must be an existing folder.'}
+}
+function Complete-OwnedSetup {
+    if($BridgeOwned){& (Join-Path $PSScriptRoot 'New-AgentSession.ps1') -Config $bridgePath -WorkingDirectory $WorkingDirectory -Name 'mirtar #1'}
+}
 New-Item -ItemType Directory -Path $privateDir -Force | Out-Null
 if ($AddWiFi) {
     $device = Get-Content -LiteralPath $devicePath -Raw | ConvertFrom-Json
@@ -15,8 +23,8 @@ if ($AddWiFi) {
     $server = $chosen[0]
 } else {
     if ((Test-Path -LiteralPath $devicePath) -or (Test-Path -LiteralPath $bridgePath)) { throw 'Private configuration already exists. Edit it locally or use -AddWiFi; no files were overwritten.' }
-    if (!$SessionId) { $SessionId = Read-Host 'Existing Codex desktop thread UUID' }
-    if ($SessionId -notmatch '^[a-fA-F0-9-]{36}$') { throw 'Invalid native thread ID' }
+    if (!$BridgeOwned -and !$SessionId) { $SessionId = Read-Host 'Existing Codex desktop thread UUID' }
+    if (!$BridgeOwned -and $SessionId -notmatch '^[a-fA-F0-9-]{36}$') { throw 'Invalid native thread ID' }
     if (!$BridgeAddress) { $BridgeAddress = if ($BluetoothOnly) { '127.0.0.1' } else { Read-Host 'This Windows computer LAN IPv4 address' } }
     $parsedAddress = $null
     if (![Net.IPAddress]::TryParse($BridgeAddress, [ref]$parsedAddress) -or $parsedAddress.AddressFamily -ne 'InterNetwork') { throw 'Use a LAN IPv4 address' }
@@ -56,10 +64,12 @@ if ($AddWiFi) {
     }
     if ([IO.Path]::GetExtension($CodexBin) -ne '.exe' -or !(Test-Path -LiteralPath $CodexBin -PathType Leaf)) { throw 'Provide the actual native Codex executable with -CodexBin.' }
     $bridge = @{version=1;server=@{id=$ServerId;name=$Name};bluetooth=@{enabled=$true;hostName=$BluetoothName};listen=@{host=$BridgeAddress;port=$Port;allowLanPlaintext=$true};devices=@(@{id=$device.deviceId;secret=$secret});codex=@{bin=$codexBin;edgePath='C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe';sessions=@(@{id=$SessionId;name='mirtar #1'})}}
+    if($BridgeOwned){$bridge.codex.sessions=@()}
 }
 if (($BluetoothOnly -or $NoWiFiPrompt) -and !$AddWiFi) {
     $device | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $devicePath -Encoding utf8
     $bridge | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $bridgePath -Encoding utf8
+    Complete-OwnedSetup
     Write-Host 'Private computer configuration saved. Import device.config.json on the card setup page; home Wi-Fi credentials were not requested.'
     return
 }
@@ -79,5 +89,6 @@ try {
     $device | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $devicePath -Encoding utf8
     if (!$AddWiFi) { $bridge | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $bridgePath -Encoding utf8 }
 } finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($pointer); $password = $null }
+Complete-OwnedSetup
 Write-Host 'Host Wi-Fi saved in private version 2 configuration. Values were not printed.'
 Write-Host 'Update one host with -AddWiFi -ServerId ID. Import the device file with Add config-file.'

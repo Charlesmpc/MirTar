@@ -63,6 +63,8 @@ required = {'README.md', 'README.zh-CN.md', '.gitignore', 'package.json', 'packa
             'firmware/main/state.c', 'firmware/main/state.h', 'firmware/tests/config_test.c', 'firmware/tests/stubs/esp_err.h', 'firmware/tests/stubs/nvs.h',
             'firmware/main/bond_store.c','firmware/main/bond_store.h','firmware/tests/bond_store_test.c',
             'firmware/main/server_delete.c','firmware/main/server_delete.h','firmware/tests/server_delete_test.c','tools/test-server-delete.py',
+            'firmware/main/question.c','firmware/main/question.h','firmware/tests/question_test.c',
+            'tools/New-AgentSession.ps1','tools/new-agent-session.ts',
             'firmware/tests/bond_stubs/nvs_memory.c','firmware/tests/bond_stubs/nvs_memory.h',
             'firmware/tests/bond_stubs/esp_err.h','firmware/tests/bond_stubs/esp_random.h','firmware/tests/bond_stubs/nvs.h',
             'tools/validation/Stop-TestBrowser.ps1', 'firmware/UPSTREAM.md', 'firmware/UPSTREAM.zh_CN.md',

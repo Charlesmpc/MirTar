@@ -1,6 +1,7 @@
 # Server onboarding (development build)
 
-The development version is `0.5.3`; the published stable version is `0.5.2`. The reading skin and Codex voice path remain.
+The development version is `0.5.4`; the published stable version is `0.5.2`. The reading skin and Codex voice path remain.
+For new bridge-owned sessions with card questions, see [question setup](agent-questions.md). Existing desktop-session setup below remains supported.
 The public v0.5.1 image was submitted for community review on 2026-10-25 (project 1619, revision 3705).
 Its submission receipt was pending. The owner subsequently confirmed successful device validation on 2026-10-25;
 community review status is separate from hardware validation.
@@ -111,7 +112,7 @@ Compiled v0.3.1 config and v0.4.0's old NVS format are not automatically migrate
 
 Run `npm.cmd run check`, `npm.cmd test`, and `npm.cmd run test:portal`.
 Firmware builds use ESP-IDF 5.5.6: `.\tools\Build-Firmware.ps1`. Windows PowerShell can start the build helper.
-The current development merged output is `.private/build-v0.5.3/MirTar-full.bin`, flashed at **0x0**.
+The current development merged output is `.private/build-v0.5.4/MirTar-full.bin`, flashed at **0x0**.
 With a compatible partition layout, segmented `Flash-Firmware.ps1 -Port COMx -PreserveNvs` preserves NVS;
 add `-WhatIf` for a device-free preview. Preserve original files and verified firmware first.
 No automatic flashing is authorized. Public builds never contain actual credentials; their `-Config` is disabled.

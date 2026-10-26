@@ -27,6 +27,7 @@
 #include "wifi_portal.h"
 #include "ble_transport.h"
 #include "server_delete.h"
+#include "question.h"
 
 typedef enum { EV_KEY, EV_WIFI_ON, EV_WIFI_OFF, EV_WS_ON, EV_WS_OFF, EV_JSON, EV_AUDIO_DONE, EV_BLE_PIN, EV_CONFIG } event_kind_t;
 typedef struct { event_kind_t kind; int key, action; uint32_t generation; char *json; } event_t;
@@ -65,6 +66,12 @@ static bool pair_finished, reset_confirm_yes, reset_done;
 static int transport_index;
 static bool delete_confirm_yes;
 static char pending_delete_id[41];
+static mt_question_t question;
+static char question_body[4096];
+static int answer_index;
+static bool recording_answer;
+static void show_question(void);
+static void show_answer_menu(void);
 static void show_home(void);
 static void read_settings(void);
 static void enter_pairing(void);
@@ -98,10 +105,42 @@ static cJSON *message(const char *type) {
     cJSON *o = cJSON_CreateObject(); cJSON_AddStringToObject(o, "type", type); return o;
 }
 static void choose_session(void) {
+    mt_question_clear(&question);state.question_pending=state.answer_submitting=false;
     state.page = MT_READING; follow_reply = true; pending_reply[0] = 0; reply[0] = 0;
     cJSON *o = message("select"); cJSON_AddStringToObject(o, "sessionId", state.sessions[state.selected].id);
     if (!send_json(o)) status("连接已断开"); else status("正在打开会话");
     render("正在读取会话内容");
+}
+static void show_question(void) {
+    state.page=MT_QUESTION;
+    snprintf(question_body,sizeof(question_body),"问题 %d/%d  %s\n\n%s",question.index,question.count,question.header,question.text);
+    for(int i=0;i<question.option_count;i++){
+        size_t offset=strlen(question_body);
+        snprintf(question_body+offset,sizeof(question_body)-offset,"\n\n%d. %s\n%s",i+1,question.options[i].label,question.options[i].description);
+    }
+    status(question.unknown?"状态未知，长按 OK 返回":question.blocked?"OK 查看可用操作":question.locked?"回答已发送，等待确认":"OK 回答  上下翻阅");render(question_body);
+}
+static int answer_count(void){return question.blocked?2:question.option_count+3;}
+static void show_answer_menu(void) {
+    char body[512]="选择回答方式\n\n";int count=answer_count(),first=answer_index>0?answer_index-1:0;
+    if(first+3>count)first=count>3?count-3:0;
+    for(int i=first;i<count&&i<first+3;i++){
+        const char *label=question.blocked?(i==0?"跳过这组问题":"返回问题"):
+            i==0?"语音回答":i<=question.option_count?question.options[i-1].label:i==question.option_count+1?"跳过这组问题":"返回问题";
+        char short_label[40];size_t length=strlen(label);if(length>33){length=33;while(length&&((unsigned char)label[length]&0xc0)==0x80)length--;}
+        memcpy(short_label,label,length);short_label[length]=0;
+        size_t offset=strlen(body);snprintf(body+offset,sizeof(body)-offset,"%s %s%s\n\n",i==answer_index?">":" ",short_label,strlen(label)>length?"...":"");
+    }
+    state.page=MT_ANSWER_MENU;status("上下选择  OK 确认");render(body);
+}
+static void direct_answer(bool skip,int option) {
+    if(!mt_can_answer(&state)||question.unknown||(!skip&&question.locked))return;
+    state.input_id++;if(!state.input_id)state.input_id=1;recording_id=state.input_id;
+    cJSON *o=message(skip?"answer_skip":"answer_choice");cJSON_AddNumberToObject(o,"id",recording_id);
+    cJSON_AddStringToObject(o,"interactionId",question.interaction_id);cJSON_AddStringToObject(o,"questionId",question.question_id);
+    if(!skip)cJSON_AddNumberToObject(o,"option",option);
+    if(!send_json(o)){status("连接已断开");render(NULL);return;}
+    state.answer_submitting=true;question.locked=true;status("正在提交回答");render(NULL);
 }
 static void show_sessions(void) {
     char body[800] = "选择会话\n\n";
@@ -214,6 +253,7 @@ static bool disconnect_target(void) {
     }
     state.wifi = false; wifi_attempt_active = false; wifi_retry_at = wifi_attempt_deadline = 0;
     mt_disconnect(&state);
+    mt_question_clear(&question);
     return true;
 }
 static void finish_server_delete(bool retry) {
@@ -329,7 +369,7 @@ static void audio_worker(void *arg) {
     uint8_t frame[652];
     for (;;) {
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-        uint32_t sequence = 0, current_id = recording_id; bool failed = false;
+        uint32_t sequence = 0, current_id = recording_id; bool failed = false,current_answer=recording_answer;
         if (bsp_audio_wake() != ESP_OK) failed = true;
         int64_t start = esp_timer_get_time();
         while (atomic_load(&audio_running) && !failed) {
@@ -348,7 +388,7 @@ static void audio_worker(void *arg) {
         }
         if (bsp_audio_sleep() != ESP_OK) { failed = true; atomic_store(&audio_ok, false); }
         bool commit = atomic_load(&audio_submit) && !failed;
-        cJSON *o = message(commit ? "commit" : "cancel");
+        cJSON *o = message(commit ? current_answer?"answer_commit":"commit" : "cancel");
         cJSON_AddNumberToObject(o, "id", current_id); cJSON_AddNumberToObject(o, "frames", sequence);
         if (!send_json(o)) failed = true;
         atomic_store(&audio_running, false);
@@ -358,12 +398,15 @@ static void audio_worker(void *arg) {
     }
 }
 static void start_audio(void) {
-    if (!mt_can_record(&state) || atomic_load(&audio_busy)) return;
+    bool answering=state.question_pending;
+    if ((!answering&&!mt_can_record(&state))||(answering&&(!mt_can_answer(&state)||question.locked)) || atomic_load(&audio_busy)) return;
     if (!atomic_load(&audio_ok)) { status("麦克风不可用"); render("请重启后再试\n\n仍失败时检查串口日志"); return; }
     /* Drain the prior cooperative stop acknowledgement before reuse. */
     xSemaphoreTake(audio_stopped, 0);
     state.input_id++; if (!state.input_id) state.input_id = 1; recording_id = state.input_id;
-    cJSON *o = message("begin"); cJSON_AddNumberToObject(o, "id", recording_id);
+    recording_answer=answering;
+    cJSON *o = message(answering?"answer_begin":"begin"); cJSON_AddNumberToObject(o, "id", recording_id);
+    if(answering){cJSON_AddStringToObject(o,"interactionId",question.interaction_id);cJSON_AddStringToObject(o,"questionId",question.question_id);}
     if (!send_json(o)) { status("连接已断开"); render(NULL); return; }
     state.recording = true; atomic_store(&audio_busy, true); atomic_store(&audio_submit, false);
     atomic_store(&audio_seconds, 0); atomic_store(&audio_level, 0); atomic_store(&audio_running, true);
@@ -409,9 +452,32 @@ static void handle_json(const char *data) {
         if (!state.session_count) { status("没有可用会话"); render("请在电脑配置已有的 Codex 桌面会话"); }
         else if (state.session_count == 1) choose_session(); else show_sessions();
     } else if (!strcmp(type, "selected")) { status("就绪  OK 录音"); render("按 OK 开始说话\n\n上下翻阅内容\n长按上下切换会话"); }
+    else if(!strcmp(type,"question")) {
+        const char *selected=state.sessions[state.selected].id;
+        bool same=!strcmp(question.interaction_id,str(o,"interactionId"))&&!strcmp(question.question_id,str(o,"questionId"));
+        if(mt_question_read(&question,o,selected)){
+            if(state.recording&&!same)stop_audio();
+            state.question_pending=true;state.answer_submitting=question.locked&&!question.blocked;
+            if(!state.recording){answer_index=0;show_question();}
+        }
+    } else if(!strcmp(type,"question_resolved")) {
+        if(mt_question_resolve(&question,o,state.sessions[state.selected].id)){
+            if(state.recording&&recording_answer)stop_audio();
+            state.question_pending=state.answer_submitting=false;state.page=MT_READING;
+            status(state.submitting?"等待任务继续":"就绪  OK 录音");render(state.submitting?"问题已关闭\n\n等待任务继续":reply[0]?reply:"按 OK 开始说话");
+        }
+    } else if(!strcmp(type,"task_state")) {
+        if(!strcmp(str(o,"sessionId"),state.sessions[state.selected].id)){
+            const char *value=str(o,"state");state.submitting=!strcmp(value,"running");
+            if(!state.submitting){submitted_session[0]=0;if(!state.question_pending&&!state.recording){state.page=MT_READING;
+                if(!strcmp(value,"failed")||!strcmp(value,"interrupted")){status("任务停止，请到电脑查看");render("任务失败或已中断\n\n没有自动重新提交");}
+                else{status("任务已结束，正在读取回复");render(NULL);}}}
+        }
+    }
     else if (!strcmp(type, "reply")) {
-        if (state.page != MT_READING || strcmp(str(o, "sessionId"), state.sessions[state.selected].id)) { cJSON_Delete(o); return; }
+        if (strcmp(str(o, "sessionId"), state.sessions[state.selected].id)) { cJSON_Delete(o); return; }
         snprintf(reply, sizeof(reply), "%s", str(o, "text"));
+        if(state.question_pending){cJSON_Delete(o);return;}
         if (follow_reply && !state.recording) { status("就绪  OK 录音"); render(reply); }
         else { snprintf(pending_reply, sizeof(pending_reply), "%s", reply); status("有新回复  下翻查看"); render(NULL); }
     } else if (!strcmp(type, "state")) {
@@ -421,18 +487,29 @@ static void handle_json(const char *data) {
             if (cJSON_IsNumber(id) && (uint32_t)id->valuedouble == recording_id) { state.submitting = false; submitted_session[0] = 0; }
         }
         if (strcmp(str(o, "sessionId"), state.sessions[state.selected].id)) { cJSON_Delete(o); return; }
-        if (!strcmp(value, "recognizing")) { status("正在完成语音识别"); render("录音已结束\n\n等待最后一段识别完成"); }
+        if(!strcmp(value,"answer_accepted")){
+            state.answer_submitting=question.present&&question.locked;
+            if(question.present&&!question.locked)show_question();else{status("回答已发送，等待任务继续");render(NULL);}
+        }
+        else if (!strcmp(value, "recognizing")) { status("正在完成语音识别"); render("录音已结束\n\n等待最后一段识别完成"); }
         else if (!strcmp(value, "submitting")) { status("正在提交到会话"); render("语音识别完成\n\n正在提交到 Codex 会话"); }
         else if (!strcmp(value, "accepted")) { status("已接受，等待回复"); render("Codex 已接受消息\n\n等待任务执行与回复"); }
         else if (!strcmp(value, "submission_unknown")) { state.submitting = true; status("提交状态未知"); render("请在电脑上确认\n\n不会自动重发录音"); }
     } else if (!strcmp(type, "error")) {
         const char *session_id = str(o, "sessionId");
-        if (session_id[0] && state.page == MT_READING && strcmp(session_id, state.sessions[state.selected].id)) {
-            if (!strcmp(session_id, submitted_session) && strcmp(str(o, "code"), "submission_unknown")) { state.submitting = false; submitted_session[0] = 0; }
+        if (session_id[0] && strcmp(session_id, state.sessions[state.selected].id)) {
+            if (state.page==MT_READING&&!strcmp(session_id, submitted_session) && strcmp(str(o, "code"), "submission_unknown")) { state.submitting = false; submitted_session[0] = 0; }
             cJSON_Delete(o); return;
         }
         atomic_store(&audio_submit, false); atomic_store(&audio_running, false); state.recording = false;
         bool unknown = !strcmp(str(o, "code"), "submission_unknown") || !strcmp(str(o, "code"), "input_cancelled_or_pending");
+        if(state.question_pending||cJSON_IsTrue(cJSON_GetObjectItem(o,"answering"))){
+            state.answer_submitting=unknown;
+            if(question.present&&!unknown)question.locked=question.blocked;
+            if(question.present){show_question();status(unknown?"状态未知，不自动重发":"回答未提交，请重新选择");render(NULL);}
+            else{status("问题已关闭，等待任务继续");render(NULL);}
+            cJSON_Delete(o);return;
+        }
         state.submitting = unknown;
         status(unknown ? "请到电脑确认状态" : "发生错误，请重试");
         render(unknown ? "提交状态待确认\n\n不会自动重发录音" : "连接或语音处理失败\n\n请检查电脑桥接\n长按 OK 返回");
@@ -477,17 +554,32 @@ static void handle_key(int key, int action) {
     }
     if (state.recording) {
         if (key == BSP_BTN_OK && action == BSP_BTN_CLICK) {
-            state.recording = false; state.submitting = true; atomic_store(&audio_submit, true); atomic_store(&audio_running, false);
-            snprintf(submitted_session, sizeof(submitted_session), "%s", state.sessions[state.selected].id);
+            state.recording = false;if(recording_answer){state.answer_submitting=true;question.locked=true;}else state.submitting = true;
+            atomic_store(&audio_submit, true); atomic_store(&audio_running, false);
+            if(!recording_answer)snprintf(submitted_session, sizeof(submitted_session), "%s", state.sessions[state.selected].id);
             status("正在上传语音"); render("录音已结束\n\n正在发送到电脑");
         }
         return;
     }
     int direction = key == BSP_BTN_UP ? -1 : 1;
-    if (action == BSP_BTN_LONG && key != BSP_BTN_OK && state.page == MT_READING && state.session_count > 1) {
+    if (action == BSP_BTN_LONG && key != BSP_BTN_OK && (state.page == MT_READING||state.page==MT_QUESTION||state.page==MT_ANSWER_MENU) && state.session_count > 1) {
         state.selected = (state.selected + state.session_count + direction) % state.session_count; choose_session(); return;
     }
     if (action != BSP_BTN_CLICK) return;
+    if(state.page==MT_QUESTION){
+        if(key==BSP_BTN_OK){if(mt_can_answer(&state)&&!question.unknown&&(!question.locked||question.blocked)){answer_index=0;show_answer_menu();}}
+        else if(bsp_lvgl_lock(100)){mt_ui_scroll(direction);bsp_lvgl_unlock();}
+        return;
+    }
+    if(state.page==MT_ANSWER_MENU){
+        if(key!=BSP_BTN_OK){answer_index=(answer_index+answer_count()+direction)%answer_count();show_answer_menu();}
+        else if(question.blocked){if(answer_index==0)direct_answer(true,0);else show_question();}
+        else if(answer_index==0)start_audio();
+        else if(answer_index<=question.option_count)direct_answer(false,answer_index-1);
+        else if(answer_index==question.option_count+1)direct_answer(true,0);
+        else show_question();
+        return;
+    }
     if(state.page==MT_HOME) {
         if(key!=BSP_BTN_OK){int first=target_count?0:1,count=target_count?3:2;home_index=first+(home_index-first+count+direction)%count;show_home();}
         else if(home_index==0){if(target_count)show_machines();else{status("暂无主机，请选择 Add server");render(NULL);}}
@@ -573,7 +665,7 @@ void app_main(void) {
                 state.connected = true;
                 printf("MirTar link: mode=%s heap=%u largest=%u\n", state.transport == MT_BLUETOOTH ? "BLE" : "Wi-Fi",
                     (unsigned)esp_get_free_heap_size(), (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
-                cJSON *o = message("hello"); cJSON_AddNumberToObject(o, "version", 1); cJSON_AddStringToObject(o, "deviceId", device_id); cJSON_AddStringToObject(o, "bootId", boot_id); send_json(o);
+                cJSON *o = message("hello"); cJSON_AddNumberToObject(o, "version", 1); cJSON_AddBoolToObject(o,"questions",true);cJSON_AddStringToObject(o, "deviceId", device_id); cJSON_AddStringToObject(o, "bootId", boot_id); send_json(o);
                 if(state.page!=MT_BLE_RESET_CONFIRM){status("正在校验电脑绑定");render(NULL);}break;
             }
             case EV_WS_OFF:
@@ -600,6 +692,7 @@ void app_main(void) {
             case EV_AUDIO_DONE:
                 if ((uint32_t)event.key != recording_id) break;
                 state.recording = false;
+                if(recording_answer){if(!event.action){state.answer_submitting=false;if(question.present){question.locked=question.blocked;show_question();}}break;}
                 if (!event.action && state.page == MT_READING) { state.submitting = false; status("录音未提交"); render("录音失败或已取消\n\n单次最多 10 分钟\n按 OK 重新录音"); }
                 break;
             }

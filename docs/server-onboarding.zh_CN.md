@@ -1,6 +1,7 @@
 # 主机添加与配置导入（开发版）
 
-当前开发版本为 `0.5.3`，已发布稳定版为 `0.5.2`。保留专注阅读皮肤与 Codex 语音链路。
+当前开发版本为 `0.5.4`，已发布稳定版为 `0.5.2`。保留专注阅读皮肤与 Codex 语音链路。
+需要新桥接驱动会话与卡片问答时，见[问答设置](agent-questions.zh_CN.md)；以下原桌面会话配置仍受支持。
 v0.5.1 公版已于 2026-10-25 提交社区审核（项目 1619，版本记录 3705），回执为待审核。
 作者随后于 2026-10-25 确认 v0.5.1 实机验证通过；社区审核与硬件验证是独立状态。
 
@@ -134,7 +135,7 @@ npm.cmd run test:portal
 .\tools\Flash-Firmware.ps1 -Port COMx -PreserveNvs -WhatIf
 ```
 
-当前开发固件在 `.private/build-v0.5.3/MirTar-full.bin`，完整镜像从 **0x0** 刷入。
+当前开发固件在 `.private/build-v0.5.4/MirTar-full.bin`，完整镜像从 **0x0** 刷入。
 原分区兼容时用 `-PreserveNvs` 分段刷写；完整镜像会影响已有配置，刷前保留旧文件和已验证固件。
 未经用户明确授权，不自动刷机。公开构建不读取实际配置；个人预置请使用独立的
 `Build-PersonalFirmware.ps1`，见[构建与发布隔离](build-variants.zh_CN.md)。公开构建的 `-Config` 参数禁用。

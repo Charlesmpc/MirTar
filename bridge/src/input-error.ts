@@ -5,6 +5,7 @@ const publicCodes = new Set([
   'unexpected_voice_turn', 'incomplete_transcript', 'invalid_transcript',
   'media_engine_unavailable', 'input_cancelled', 'submission_unknown',
   'codex_timeout', 'codex_disconnected', 'bridge_busy', 'audio_backpressure', 'audio_limit',
+  'question_expired', 'secret_input_required', 'questions_unavailable',
 ]);
 
 export function safeInputErrorCode(error: unknown): string {

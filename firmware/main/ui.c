@@ -56,7 +56,7 @@ void mt_ui_render(const mt_state_t *s, const char *status, const char *body, int
     else snprintf(info, sizeof(info), "MirTar %s", esp_app_get_description()->version);
     lv_label_set_text(top, s->bound ? s->target_name : s->page == MT_HOME || s->page == MT_MACHINES ? info : s->page == MT_SETUP ? "Config upload" : s->transport == MT_BLUETOOTH ? "Bluetooth" : s->wifi ? "Wi-Fi" : "Offline");
     if (s->page != MT_SETUP) { if (setup_qr) lv_obj_add_flag(setup_qr, LV_OBJ_FLAG_HIDDEN); lv_obj_set_pos(text, 4, 4); }
-    if (s->page == MT_READING && s->selected < s->session_count) {
+    if ((s->page == MT_READING||s->page==MT_QUESTION||s->page==MT_ANSWER_MENU) && s->selected < s->session_count) {
         snprintf(info, sizeof(info), "Codex / %s", s->sessions[s->selected].name); lv_label_set_text(header, info);
     }
     else lv_label_set_text(header, s->page == MT_SETUP ? "扫码上传 config-file" : "MirTar / Codex");

@@ -5,6 +5,7 @@
 #include "runtime_config.h"
 #include "state.h"
 #include "nvs.h"
+void mt_test_questions(void);
 static char stored[MT_CONFIG_LIMIT + 1], pending[MT_CONFIG_LIMIT + 1];
 static size_t stored_size, pending_size;
 static bool fail_commit;
@@ -29,6 +30,7 @@ static cJSON *with_server(const char *id,const char *ssid){
     cJSON_AddItemToArray(cJSON_GetObjectItem(config,"servers"),server);assert(mt_config_valid(config));return config;
 }
 int main(int argc,char **argv){
+    mt_test_questions();
     if(argc==3&&!strcmp(argv[1],"--validate")){
         FILE *file=fopen(argv[2],"rb");assert(file);char buffer[MT_CONFIG_LIMIT+4];size_t count=fread(buffer,1,sizeof(buffer)-1,file);assert(!ferror(file));fclose(file);buffer[count]=0;
         char *json=buffer;size_t offset=count>=3&&(unsigned char)buffer[0]==0xef&&(unsigned char)buffer[1]==0xbb&&(unsigned char)buffer[2]==0xbf?3:0;

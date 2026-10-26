@@ -11,7 +11,8 @@ const path = resolve(process.argv[2] || '.private/bridge.config.json');
 const config = JSON.parse((await readFile(path, 'utf8')).replace(/^\uFEFF/, '')) as BridgeConfig;
 if (config.bluetooth?.hostName && !/^[a-zA-Z0-9_-]{1,20}$/.test(config.bluetooth.hostName)) throw Error('Bluetooth hostName must be 1–20 ASCII letters, digits, underscore or hyphen');
 if (!config.codex?.sessions?.length || config.codex.sessions.length > 8 ||
-    config.codex.sessions.some(s => !/^[a-f0-9-]{36}$/i.test(s.id) || Buffer.byteLength(s.name) > 60)) throw Error('Configure 1–8 existing desktop sessions, with names at most 60 UTF-8 bytes');
+    config.codex.sessions.some(s => !/^[a-f0-9-]{36}$/i.test(s.id) || !s.name || Buffer.byteLength(s.name) > 60 ||
+      s.execution != null && !['desktop', 'bridge'].includes(s.execution) || s.execution === 'bridge' && (!s.cwd || !/^(?:[A-Za-z]:[\\/]|\/)/.test(s.cwd)))) throw Error('Configure 1–8 sessions; bridge-owned sessions require an absolute working directory');
 const adapter = new CodexAdapter(config.codex, new WindowsMediaHost(config.codex.edgePath));
 try {
   await adapter.initialize();
@@ -23,6 +24,7 @@ try {
   const bluetooth = bluetoothEnabled ? startWindowsBle(config.bluetooth?.hostName, bridge.acceptPeer) : undefined;
   console.log('MirTar bridge ready:', JSON.stringify(bridge.address));
   console.log('Native sessions:', config.codex.sessions.length, '| Bluetooth:', bluetoothEnabled, '| TTS off');
+  console.log('Bridge-owned sessions:', config.codex.sessions.filter(s => s.execution === 'bridge').length, '| Questions supported in bridge-owned sessions');
   console.log('Voice: live native stream | max 10 min | submit only after end and finalization');
   if (!available && bluetoothEnabled) console.log('Configured Wi-Fi IP is unavailable; listener uses loopback. Bluetooth is independent of the LAN.');
   let stopping = false;

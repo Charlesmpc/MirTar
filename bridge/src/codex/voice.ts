@@ -71,7 +71,7 @@ export async function transcribeNative(bin: string, mediaHost: MediaHost, input:
         if (!threadId || sdp) throw Error('duplicate_offer');
         await rpc.request('thread/realtime/start', { threadId, version: 'v3', outputModality: 'audio',
           includeStartupContext: false,
-          prompt: 'You are a native Codex voice input terminal. Transcribe all spoken requests accurately and acknowledge only Received. Do not execute, delegate, or call tools. A separate desktop task executes the transcribed request.',
+          prompt: 'You are a native Codex voice input terminal. Transcribe all spoken requests accurately and acknowledge only Received. Do not execute, delegate, or call tools. A separate Agent session executes the transcribed request.',
           transport: { type: 'webrtc', sdp: body } }, 30000);
         const deadline = Date.now() + 30000;
         while (!sdp && Date.now() < deadline && !signal.aborted) await delay(100);

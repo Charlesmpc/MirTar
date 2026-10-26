@@ -7,6 +7,6 @@
   "codex": {
     "bin": "codex",
     "edgePath": "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
-    "sessions": [{ "id": "EXISTING_DESKTOP_THREAD_UUID", "name": "mirtar #1" }]
+    "sessions": [{ "id": "EXISTING_DESKTOP_THREAD_UUID", "name": "mirtar #1", "execution": "desktop" }]
   }
 }

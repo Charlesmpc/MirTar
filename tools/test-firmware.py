@@ -28,7 +28,7 @@ environment = {**os.environ, 'ZIG_GLOBAL_CACHE_DIR': str(output/'zig-global'), '
 environment.update({'TMP': str(output/'temp'), 'TEMP': str(output/'temp')})
 subprocess.run(command + ['-std=c11', '-Wall', '-Wextra', '-Werror',
     '-I'+str(root/'firmware/tests/stubs'), '-I'+str(root/'firmware/main'), '-I'+str(cjson),
-    str(root/'firmware/tests/config_test.c'), str(root/'firmware/main/runtime_config.c'), str(root/'firmware/main/state.c'), str(cjson/'cJSON.c'),
+    str(root/'firmware/tests/config_test.c'), str(root/'firmware/tests/question_test.c'), str(root/'firmware/main/question.c'), str(root/'firmware/main/runtime_config.c'), str(root/'firmware/main/state.c'), str(cjson/'cJSON.c'),
     '-o', str(executable)], env=environment, check=True)
 receipt = output/'config-tests.receipt.txt'
 receipt.unlink(missing_ok=True)

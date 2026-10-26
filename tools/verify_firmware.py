@@ -37,6 +37,9 @@ if tuple(map(int,manifest['version'].split('.')[:3])) >= (0,5,1):
     if tuple(map(int,manifest['version'].split('.')[:3])) >= (0,5,3):
         assert {'mt_server_delete','mt_server_delete_recover','mt_bond_forget'}.issubset(names), 'Server deletion and boot recovery must be linked'
         manifest.update(serverDeleteScope='server',serverDeleteRecovery=True)
+    if tuple(map(int,manifest['version'].split('.')[:3])) >= (0,5,4):
+        assert {'mt_question_read','mt_question_resolve','mt_can_answer'}.issubset(names), 'Card question parser and answer guards must be linked'
+        manifest.update(cardQuestions=True,questionProtocol=1)
 numbers = re.match(r'(\d+)\.(\d+)', project.get('project_version', ''))
 assert numbers and tuple(map(int, numbers.groups())) >= (0, 4), 'Use the matching pre-provisioning verifier for old images'
 manifest['templateConfiguration'] = False

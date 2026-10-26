@@ -43,10 +43,12 @@ plaintext traffic and must stay on a trusted LAN.
 
 The OS integration is a separate adapter layer. **Windows is implemented today;
 macOS and Linux bridges are planned.** The current Agent adapter is Codex.
-**Current version: v0.5.2** — live native voice forwarding and up to 10 minutes per recording.
+**Latest published stable: v0.5.2** — live native voice forwarding and up to 10 minutes per recording.
 The bridge forwards audio while you speak, then submits once after you press OK again and native transcription has finished. Update the bridge for streaming; update the firmware as well to remove its old 30-second limit.
 See the [v0.5.2 validation and upgrade notes](docs/validation/streaming-voice-0.5.2.md).
-Development for **v0.5.3** adds [Delete server](docs/validation/delete-server-0.5.3.md): remove a saved host and all of its badge-side connections. It is not a published release yet.
+Development for **v0.5.4** adds [card questions and voice answers](docs/agent-questions.md) in new bridge-owned Codex sessions,
+alongside [Delete server](docs/validation/delete-server-0.5.3.md). Real backend/native-ASR round-trip and completed-session continuity
+have passed; physical badge acceptance is still pending. This is not a published release yet.
 The new home has **Server list / Add server / Add config-file**. Bluetooth enrollment exchanges host identity and binding;
 file import uses an explicitly opened card hotspot. Each host owns its own optional Wi-Fi settings.
 The owner confirmed successful physical-device validation of v0.5.1 on 2026-10-25.
@@ -59,8 +61,8 @@ AI Passport microphone / buttons / screen
        ↕ Bluetooth LE (default) or local Wi-Fi
 Bridge: device transport → Agent adapter
        ↳ OS adapter: Windows today; macOS / Linux planned
-       ↕ native voice, existing session, completed replies
-Agent desktop (Codex today)
+       ↕ native voice, replies; questions in bridge-owned mode
+Codex: desktop-forwarded or bridge-owned session
 ```
 
 The bridge uses Codex's native voice service, without another ASR provider or ASR
@@ -114,7 +116,7 @@ v0.5.1 was submitted for community review on 2026-10-25 (project 1619, revision 
 The verified receipt is **pending review**, not confirmation of public availability.
 Build the credential-free image locally; preserve earlier verified images for rollback.
 
-The latest published public firmware is **0.5.2**; current source builds **0.5.3 development**. A default build never reads personal config and starts with no saved hosts on fresh NVS.
+The latest published public firmware is **0.5.2**; current source builds **0.5.4 development**. A default build never reads personal config and starts with no saved hosts on fresh NVS.
 Use `Build-PersonalFirmware.ps1` for a separately labeled local image containing an NVS preset. Its app has the source version;
 its package and card label include the selected personal suffix. Personal images must never enter a Release or community upload.
 One public codebase is maintained; the old private history archive does not need ongoing development.
@@ -126,7 +128,9 @@ Implemented adapters: Windows host and Codex Agent. Both BLE and trusted-LAN Wi-
 are included in the current version, alongside native voice forwarding, existing
 desktop sessions, completed text replies, and two display skins.
 The OS adapter layer is independent; macOS and Linux implementations are planned.
-TTS/card playback, live tool progress/approval UI, Cursor, cloud provisioning and
+Card questions work in explicitly configured bridge-owned sessions; existing desktop dialogs stay with their desktop owner.
+See [setup and limits](docs/agent-questions.md) and [validation evidence](docs/validation/agent-questions-0.5.4.md).
+TTS/card playback, live tool progress/execution approval UI, Cursor, cloud provisioning and
 OTA are not implemented. Maximum recording: 10 minutes; press OK again before the limit. Reaching the hard limit cancels the recording instead of submitting without confirmation.
 Native voice still requires Codex online access; startup and finalization latency remain. No independent ASR provider or extra API key is introduced.
 Incomplete input is not submitted; unknown submission outcomes are not replayed.

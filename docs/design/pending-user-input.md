@@ -1,13 +1,15 @@
 # Issue #1：桌面问题转发与语音回答
 
-状态：接入调查完成第一轮，**尚未实现**。本设计不宣称 0.5.3 已支持卡片问答。
+状态：**0.5.4 开发版已实现桥接驱动会话的卡片问答**，并通过真实后端与原生 ASR 闭环。
+以下“原实现”与接入调查描述 0.5.3 的桌面转发方式；该模式仍不接管已有桌面弹窗。
+实际使用见[卡片问答](../agent-questions.zh_CN.md)，证据与限制见[验证记录](../validation/agent-questions-0.5.4.md)。
 对应 [GitHub issue #1](https://github.com/Charlesmpc/MirTar/issues/1)。仅使用通用场景，无原始截图或个人问题内容。
 
 ## 为什么现在收不到
 
-当前 `CodexAdapter.history()` 只返回已完成 turn 的 final_answer。
-语音结束后，`beginAudio().commit()` 把识别文本交给 `thread/queue/add`，这是普通新消息。
-`CodexRpc` 对没有处理的服务端请求返回桌面处理提示，`AgentAdapter` 尚无交互请求的订阅或回答接口。
+0.5.3 的 `CodexAdapter.history()` 只返回已完成 turn 的 final_answer。
+桌面转发模式的语音结束后，`beginAudio().commit()` 把识别文本交给 `thread/queue/add`，这是普通新消息。
+原 `CodexRpc` 对没有处理的服务端请求返回桌面处理提示，原 `AgentAdapter` 没有交互请求的订阅或回答接口。
 
 卡片连上的是桥接；桥接独立启动一个 `codex app-server --listen stdio://`。
 桌面原会话由桌面的进程执行。两者能共享持久化历史与队列，但不能据此认定共享内存中的 pending request。
@@ -32,7 +34,7 @@
 官方依据：[Codex App Server](https://learn.chatgpt.com/docs/app-server)。文档确认请求／响应和 resolved 生命周期，
 没有保证另一独立进程可以接管桌面原请求。实验接口应以安装版本的 schema 为准。
 
-## 建议先做的技术验证
+## 原桌面转发路径仍待验证的接入
 
 第一步只验证连接，不先做整套卡片界面：
 
@@ -47,7 +49,11 @@
 不能用恢复到另一进程或新建 Agent 会话替代“桌面可继续操作的原会话”这一产品要求。
 UI 自动化只能作为另行评估的 Windows 适配后备方案，稳定性和后台操作能力需要实测。
 
-## 通道验证通过后的实现
+## 原目标接口草案与当前实现
+
+0.5.4 选择新建桥接驱动会话的路径，已经实现 `question()`、`beginAnswerAudio()`、`answer()` 与 `activity()`。
+普通执行模式通过持久化的 `mirtar_ask_user` 动态工具提供提问；同时兼容原生 `item/tool/requestUserInput`。
+以下接口为最初草案；当前类型和协议以 `bridge/src/contracts.ts`、`server.ts` 与使用文档为准。
 
 将问题抽象在 AgentAdapter，而不是放进 Windows 层：
 
