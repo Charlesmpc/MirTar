@@ -134,8 +134,8 @@ v0.3.1 compiled settings and v0.4.0 stored settings are not automatically migrat
 - [Build and flash](docs/device-quickstart.md) / [中文](docs/device-quickstart.zh_CN.md)
 - [Validation status](docs/validation/server-onboarding-0.5.1.md)
 
-Community project 1619 previously approved revision 3705 (v0.5.1). The 0.5.4 update materials are ready;
-see [community publishing status](docs/community-publishing.zh_CN.md) for the verified submission/review state.
+Community project 1619 has received the 0.5.4 update as revision **3961**, **pending review** as checked on 2026-10-28.
+The currently published version remains 0.5.1; see [community publishing status](docs/community-publishing.zh_CN.md).
 Build the credential-free image locally; preserve earlier verified images for rollback.
 
 The current public firmware and bridge are **0.5.4**. A default build never reads personal config and starts with no saved hosts on fresh NVS.

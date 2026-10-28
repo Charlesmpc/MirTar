@@ -113,8 +113,8 @@ npm.cmd ci --ignore-scripts
 - [固件编译与刷入](docs/device-quickstart.zh_CN.md)
 - [验证记录](docs/validation/server-onboarding-0.5.1.md)
 
-社区项目 1619 的旧公开版本为 v0.5.1（版本记录 3705，已通过审核）。0.5.4 更新资料已准备，
-提交与审核状态以[社区发布记录](docs/community-publishing.zh_CN.md)中的服务端回执为准。
+社区项目 1619 已提交 0.5.4 更新，版本记录 **3961**，2026-10-28 回读状态为**待审核**。
+社区公开版本仍为 v0.5.1，详情见[社区发布记录](docs/community-publishing.zh_CN.md)。
 可本地构建不含私人凭据的通用镜像，保留原已验证镜像作回退。
 
 当前公版固件和桥接为 `0.5.4`。不修改配置也能编译，全新设备主机列表为空。
