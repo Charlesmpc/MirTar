@@ -1,0 +1,5 @@
+Turn AI Passport into a handheld controller for Codex on your computer. Press OK to speak, press again to send, and read the reply on the card. Physical buttons let you scroll and switch sessions without a headset or leaning toward the computer microphone, while your phone stays free.
+
+Add and connect your computers over Bluetooth by default, without preloading home Wi-Fi. You can also import a computer configuration for trusted local Wi-Fi. The card-to-computer link needs no public relay.
+
+The Windows bridge can start at login and remembers each session's workspace. A dedicated Agent session can work in the background and ask questions on the card; answer by voice or choose an option to continue the original task. Card questions are experimental, and desktop and bridge cannot own the same session simultaneously. Codex itself still needs internet access. The cover is a concept illustration.

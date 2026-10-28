@@ -15,6 +15,7 @@ export interface AgentAdapter {
   history(sessionId: string): Promise<Reply[]>;
   beginAudio(sessionId: string, signal: AbortSignal, onFailure?: (error: unknown) => void): AgentAudioInput;
   activateSession?(sessionId: string): Promise<void>;
+  setupError?(): string | undefined;
   question?(sessionId: string): AgentQuestion | undefined;
   activity?(sessionId: string): AgentActivity | undefined;
   beginAnswerAudio?(sessionId: string, target: AnswerTarget, signal: AbortSignal, onFailure?: (error: unknown) => void): AgentAudioInput;
@@ -27,5 +28,5 @@ export type BridgeConfig = {
   bluetooth?: { enabled: boolean; hostName?: string };
   server?: { id: string; name: string };
   devices: { id: string; secret: string }[];
-  codex: { bin: string; edgePath: string; sessions: (Session & { execution?: 'desktop' | 'bridge'; cwd?: string })[] };
+  codex: { bin: string; edgePath: string; defaultWorkingDirectory?: string; sessions: (Session & { execution?: 'desktop' | 'bridge'; cwd?: string })[] };
 };

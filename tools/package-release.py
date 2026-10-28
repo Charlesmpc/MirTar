@@ -65,6 +65,8 @@ required = {'README.md', 'README.zh-CN.md', '.gitignore', 'package.json', 'packa
             'firmware/main/server_delete.c','firmware/main/server_delete.h','firmware/tests/server_delete_test.c','tools/test-server-delete.py',
             'firmware/main/question.c','firmware/main/question.h','firmware/tests/question_test.c',
             'tools/New-AgentSession.ps1','tools/new-agent-session.ts',
+            'tools/Manage-BridgeService.ps1','tools/Run-BridgeService.ps1','tools/run-bridge-service.ts',
+            'tools/Resolve-CodexBackend.ps1',
             'firmware/tests/bond_stubs/nvs_memory.c','firmware/tests/bond_stubs/nvs_memory.h',
             'firmware/tests/bond_stubs/esp_err.h','firmware/tests/bond_stubs/esp_random.h','firmware/tests/bond_stubs/nvs.h',
             'tools/validation/Stop-TestBrowser.ps1', 'firmware/UPSTREAM.md', 'firmware/UPSTREAM.zh_CN.md',
@@ -89,10 +91,11 @@ for asset, prefix in [(source, f'MirTar-{tag}/'), (runtime, 'MirTar-windows-brid
 
 assets = [{'name': path.name, 'bytes': path.stat().st_size, 'sha256': hashlib.sha256(path.read_bytes()).hexdigest()} for path in [source, runtime]]
 if firmware_manifest:
-    public_image=output/'MirTar-full.bin';public_receipt=output/'firmware-manifest.json'
+    public_image=output/'MirTar-full.bin';public_app=output/'MirTar.bin';public_receipt=output/'firmware-manifest.json'
     public_image.write_bytes((firmware_build/'MirTar-full.bin').read_bytes())
+    public_app.write_bytes((firmware_build/'MirTar.bin').read_bytes())
     public_receipt.write_text(json.dumps(firmware_manifest,indent=2)+'\n',encoding='utf-8')
-    assets.extend({'name':path.name,'bytes':path.stat().st_size,'sha256':digest(path.read_bytes())} for path in [public_image,public_receipt])
+    assets.extend({'name':path.name,'bytes':path.stat().st_size,'sha256':digest(path.read_bytes())} for path in [public_image,public_app,public_receipt])
 manifest = {'version': version, 'tag': tag, 'sourceCommit': commit, 'prerelease': args.prerelease or '-' in version,
             'configuredFirmwareIncluded': False, 'distribution':'public','firmwareIncluded':bool(firmware_manifest), 'sourceFiles': len(files), 'windowsBridgeFiles': len(runtime_files),
             'assets': assets, 'currentSourceAuditPassed': True, 'historyPrivacyReviewRequired': not audit['historyPrivateInfoClean']}

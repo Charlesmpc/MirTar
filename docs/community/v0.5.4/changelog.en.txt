@@ -1,0 +1,8 @@
+0.5.4
+- Record for up to ten minutes with live forwarding; submit once after the final native transcription is complete.
+- Add dedicated sessions that execute in the background, plus experimental card questions with voice answers and selectable options.
+- Run the Windows bridge at login, manage start/stop/restart/status/logs, avoid duplicate instances, and recover moved Codex executable paths after app updates.
+- Automatically initialize a saved default workspace, or choose an existing project directory.
+- Add Delete server to remove one computer's connection settings and pairing profile while preserving the others.
+
+Legacy desktop sessions still need desktop activation; desktop and bridge cannot own the same session simultaneously. Card questions and deletion need further physical-device acceptance.

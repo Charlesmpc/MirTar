@@ -6,12 +6,13 @@ $privateDir = Join-Path $repoRoot '.private'
 $devicePath = Join-Path $privateDir 'device.config.json'
 $bridgePath = Join-Path $privateDir 'bridge.config.json'
 if($BridgeOwned){
-    if($AddWiFi -or $SessionId -or !$WorkingDirectory){throw 'BridgeOwned requires -WorkingDirectory and cannot be combined with AddWiFi or SessionId.'}
-    $WorkingDirectory=(Resolve-Path -LiteralPath $WorkingDirectory).Path
-    if(!(Test-Path -LiteralPath $WorkingDirectory -PathType Container)){throw 'WorkingDirectory must be an existing folder.'}
+    if($AddWiFi -or $SessionId){throw 'BridgeOwned cannot be combined with AddWiFi or SessionId.'}
+    if($WorkingDirectory){$WorkingDirectory=[IO.Path]::GetFullPath($WorkingDirectory)}
+} elseif($WorkingDirectory){
+    throw 'WorkingDirectory requires -BridgeOwned.'
 }
 function Complete-OwnedSetup {
-    if($BridgeOwned){& (Join-Path $PSScriptRoot 'New-AgentSession.ps1') -Config $bridgePath -WorkingDirectory $WorkingDirectory -Name 'mirtar #1'}
+    if($BridgeOwned){Write-Host 'The bridge will initialize its first Agent session on startup. Configure its default working directory if initialization fails.'}
 }
 New-Item -ItemType Directory -Path $privateDir -Force | Out-Null
 if ($AddWiFi) {
@@ -39,6 +40,12 @@ if ($AddWiFi) {
     $server = [pscustomobject]@{id=$ServerId;name=$Name;bluetoothName=$BluetoothName;secret=$secret;wifi=$null}
     $device = [pscustomobject]@{version=2;deviceId=$DeviceId;skin='reading';allowLanPlaintext=$true;servers=@($server)}
     if (!$CodexBin) {
+        # Prefer the desktop backend used by MirTar's native voice path. An old
+        # global npm CLI may not support the current desktop model identifiers.
+        $desktopBackends=@(Get-AppxPackage -Name 'OpenAI.Codex' -ErrorAction SilentlyContinue | Sort-Object Version -Descending | ForEach-Object {Join-Path $_.InstallLocation 'app\resources\codex.exe'} | Where-Object {Test-Path -LiteralPath $_ -PathType Leaf})
+        if($desktopBackends.Count){$CodexBin=$desktopBackends[0]}
+    }
+    if (!$CodexBin) {
         $command = Get-Command codex -ErrorAction SilentlyContinue
         if ($command -and [IO.Path]::GetExtension($command.Source) -eq '.exe') { $CodexBin = $command.Source }
         elseif ($command) {
@@ -64,7 +71,10 @@ if ($AddWiFi) {
     }
     if ([IO.Path]::GetExtension($CodexBin) -ne '.exe' -or !(Test-Path -LiteralPath $CodexBin -PathType Leaf)) { throw 'Provide the actual native Codex executable with -CodexBin.' }
     $bridge = @{version=1;server=@{id=$ServerId;name=$Name};bluetooth=@{enabled=$true;hostName=$BluetoothName};listen=@{host=$BridgeAddress;port=$Port;allowLanPlaintext=$true};devices=@(@{id=$device.deviceId;secret=$secret});codex=@{bin=$codexBin;edgePath='C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe';sessions=@(@{id=$SessionId;name='mirtar #1'})}}
-    if($BridgeOwned){$bridge.codex.sessions=@()}
+    if($BridgeOwned){
+        $bridge.codex.sessions=@()
+        if($WorkingDirectory){$bridge.codex.defaultWorkingDirectory=$WorkingDirectory}
+    }
 }
 if (($BluetoothOnly -or $NoWiFiPrompt) -and !$AddWiFi) {
     $device | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $devicePath -Encoding utf8

@@ -4,6 +4,7 @@ import { PcmStream } from '../audio-stream.ts';
 import type { AgentAdapter, AgentActivity, AnswerTarget, BridgeConfig, Reply, Session } from '../contracts.ts';
 import type { MediaHost } from '../host/contracts.ts';
 import { QuestionStore } from './questions.ts';
+import { checkWorkspace } from './workspace.ts';
 
 type Rpc = Pick<CodexRpc, 'initialize' | 'request' | 'close'> & Partial<Pick<CodexRpc, 'respond' | 'rejectRequest'>> & {
   on?(event: string, listener: (...args: any[]) => void): unknown;
@@ -23,6 +24,7 @@ export class CodexAdapter implements AgentAdapter {
   private starting = new Map<string, string>();
   private activities = new Map<string, AgentActivity>();
   private questions: QuestionStore;
+  private setupFailure?: string;
   constructor(config: BridgeConfig['codex'], mediaHost: MediaHost,
     runtime?: { rpc: Rpc; transcribe: typeof transcribeNative }) {
     this.config = config; this.mediaHost = mediaHost;
@@ -60,10 +62,13 @@ export class CodexAdapter implements AgentAdapter {
     });
   }
   async initialize() { await this.rpc.initialize(); }
+  setupError() { return this.setupFailure; }
+  setSetupError(code: string) { this.setupFailure = code; }
   private allowed(id: string) { if (!this.config.sessions.some(s => s.id === id)) throw Error('session_not_allowed'); }
   async activateSession(id: string) {
     this.allowed(id); const entry = this.config.sessions.find(s => s.id === id)!;
     if (entry.execution !== 'bridge') return;
+    await checkWorkspace(entry.cwd ?? '');
     if (!this.owned.has(id)) {
       const ready = (async () => {
         const loaded = await this.rpc.request('thread/loaded/list', { limit: 100 });

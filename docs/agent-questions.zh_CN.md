@@ -1,4 +1,4 @@
-# 卡片问答：0.5.4 开发版
+# 卡片问答：0.5.4
 
 卡片可以接收专用 Agent 会话中的问题，显示正文和选项，用语音或按键回答，再继续原任务。
 会话仍由 Codex 保存；桥接维护运行连接和问题关联，不自行实现 Agent 会话系统。
@@ -15,6 +15,7 @@
 ```
 
 第一条命令创建并初始化新的 Codex 会话，向现有私有配置追加一个条目，保留原会话和设备绑定。
+也可以省略 `-WorkingDirectory`，使用下述主机默认目录。
 默认最多八条会话；脚本不会自动把已有桌面会话改成桥接模式，也不替换缺失或正在被其他进程占用的会话。
 一次简短的初始化回复使会话能落盘，之后才能安全退出设置进程并恢复。
 已有卡片主机绑定可继续使用，无需重新配对。在卡片进入会话选择页选择 **MirTar Agent**；
@@ -30,12 +31,40 @@
 
 ```powershell
 npm.cmd ci --ignore-scripts
-.\tools\New-LocalConfig.ps1 -BluetoothOnly -BridgeOwned -WorkingDirectory 'C:\Projects\MyProject'
+.\tools\New-LocalConfig.ps1 -BluetoothOnly -BridgeOwned
 ```
 
 随后按[主机添加步骤](server-onboarding.zh_CN.md)完成 Add server 和启动桥接。
-这条配置路径不要求先在桌面新建会话，不询问家庭 Wi-Fi；现有真实配置不会被覆盖。
-如果初始化中途失败，保留生成的私有文件，重试 `New-AgentSession.ps1`；不要删除原有绑定配置。
+这条命令先保存主机配置和空会话列表；不要求桌面会话 ID，不询问家庭 Wi-Fi，现有真实配置不会被覆盖。
+首次启动桥接时初始化默认工作区和专用会话。要使用已有项目，可在配置命令中加入
+`-WorkingDirectory 'C:\Projects\MyProject'`；目录必须存在且可写。
+
+## 工作目录与首次启动
+
+- 会话列表为空时，桥接使用 `codex.defaultWorkingDirectory`（如果配置），否则在当前用户目录创建
+  `MirTar/workspaces/default`。创建并检查可写后，初始化 `MirTar Agent`，将会话 ID、`execution: "bridge"`
+  和绝对路径 `cwd` 保存到本机 `.private/bridge.config.json`。后续启动恢复原会话和路径。
+- 主机默认目录只用于新会话。每个会话自己的 `cwd` 优先；多个会话可以指向不同项目。已有会话不会被重建、
+  改目录或转换模式。路径仅由本机桥接管理，卡片配置文件无需包含它。
+- `config/bridge.example.json` 现在展示空会话列表；实际设备绑定与 Codex 可执行文件仍需在本机配置，推荐使用设置工具。
+- 缺失或不可写的自定义目录、被移动的已有工作区都会阻止该会话执行，并在桥接控制台和 0.5.4 卡片上提示配置目录。
+  不会重建丢失的项目、切到其他目录或在桥接源码目录里执行。不要用清空 `sessions` 的方式修复已有会话。
+
+首次初始化失败且尚无会话：在本机配置的 `codex` 对象中加入以下字段，保存并重启桥接。
+先创建或选择实际项目目录；下面只是路径示例：
+
+```json
+"defaultWorkingDirectory": "D:\\Projects\\MyProject"
+```
+
+已有会话改目录：等任务结束、停止桥接，修改对应 `codex.sessions` 条目的 `cwd`，保留其 `id`、`name` 和
+`execution`，再重启。修改主机默认目录不会迁移已有会话，也不会搬动项目文件。
+要另建会话，运行 `New-AgentSession.ps1 -WorkingDirectory 'D:\Projects\MyProject' -Name 'Project Agent'`。
+
+初始化中的本地回执为配置文件旁的 `bridge.config.json.session-setup.local.json`，不含设备密码，但含会话 ID 和路径，
+同样不得提交。已记录的创建失败会尝试恢复同一个会话；结果未知或配置被同时修改时停止自动创建，避免反复生成会话。
+此时保留配置和回执，先检查 Codex 登录和回执；不要删除设备绑定或盲目删除回执重试。
+修改路径不会触发蓝牙重新配对，也无需重刷固件；新增的卡片错误提示需使用更新后的 0.5.4 固件。
 
 ## 在卡片上回答
 
@@ -65,4 +94,4 @@ npm.cmd ci --ignore-scripts
 语音继续使用 Codex 原生识别，没有增加独立 ASR 服务或 API Key。
 未知提交结果不自动重放。源配置、初始化回执和测试音频留在忽略的 `.private/`。
 
-见[验证记录与实际覆盖](validation/agent-questions-0.5.4.md)。这是开发版，尚待卡片实机验收。
+见[验证记录与实际覆盖](validation/agent-questions-0.5.4.md)。卡片问答仍属实验性功能，尚待完整实机验收。

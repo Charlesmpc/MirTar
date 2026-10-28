@@ -1,0 +1,5 @@
+1. On Windows, follow the 0.5.4 bridge package README to install dependencies, sign in to Codex, and initialize a dedicated Agent session.
+2. Select Add server on the card. Run .\tools\Add-Server.ps1 on the computer, enter the card's six-digit PIN in Windows, then confirm with OK on the card.
+3. Run .\tools\Manage-BridgeService.ps1 -Action Install. On the card, choose Server list → computer → Bluetooth → MirTar Agent and wait for ready.
+4. OK records and OK again sends. For a question, OK opens voice/option answers. UP/DOWN scrolls; hold them to switch sessions. Hold OK to return home.
+5. Reuse the saved connection next time. Bluetooth needs no card Wi-Fi setup; the computer needs internet access.

@@ -8,6 +8,7 @@ import type { AgentAdapter, AgentAudioInput, AnswerTarget, BridgeConfig } from '
 import { AudioInput, MAX_RECORDING_SECONDS, truncateUtf8, verifyProof } from './protocol.ts';
 import type { DevicePeer } from './transport/peer.ts';
 import { safeInputErrorCode } from './input-error.ts';
+import { WORKSPACE_ERROR } from './codex/workspace.ts';
 
 type Receipt = { status: string; clientId: string; submissionId?: string; kind?: 'input' | 'answer'; sessionId?: string; target?: AnswerTarget; variant?: string };
 type Capture = { input: AudioInput; stream: AgentAudioInput; controller: AbortController; target?: AnswerTarget; variant?: string };
@@ -23,6 +24,8 @@ export async function startBridge(config: BridgeConfig, adapter: AgentAdapter, r
   const runningJobs = new Set<Promise<void>>();
   const server = createServer((_req, res) => { res.writeHead(404).end(); });
   const wss = new WebSocketServer({ server, path: '/device', maxPayload: 8192, perMessageDeflate: false });
+  // ws forwards HTTP listen errors; keep them handled while the startup promise rejects.
+  wss.on('error', () => {});
   wss.on('connection', (ws, request) => {
     if (request.headers.origin) { ws.close(1008, 'native device only'); return; }
     acceptPeer(ws);
@@ -117,7 +120,8 @@ export async function startBridge(config: BridgeConfig, adapter: AgentAdapter, r
       }).catch(e => {
         console.error('Voice input failed:', safeInputErrorCode(e));
         if (!isAnswer && e.message !== 'submission_unknown' && awaitingReply === awaiting) awaitingReply = undefined;
-        send({ type: 'error', code: ['submission_unknown', 'question_expired', 'secret_input_required'].includes(e.message) ? e.message :
+        if (e.message === WORKSPACE_ERROR) console.error('Configure the bridge session working directory: its saved cwd must be an existing writable folder. Restart after editing the local bridge config.');
+        send({ type: 'error', code: ['submission_unknown', 'question_expired', 'secret_input_required', WORKSPACE_ERROR].includes(e.message) ? e.message :
           controller.signal.aborted ? 'input_cancelled_or_pending' : 'input_failed', sessionId: input.sessionId, id: input.id, answering: isAnswer });
       }).finally(() => { if (operation === controller) operation = undefined; runningJobs.delete(job); });
       runningJobs.add(job);
@@ -139,13 +143,20 @@ export async function startBridge(config: BridgeConfig, adapter: AgentAdapter, r
         authenticated = true; activeDevices.add(deviceId); clearTimeout(authTimeout);
         send({ type: 'bound', version: 1, adapterId: adapter.id, sessions: await adapter.sessions(),
           audio: { codec: 'pcm_s16le', sampleRate: 16000, channels: 1, maxSeconds: MAX_RECORDING_SECONDS },
-          capabilities: { textReply: true, liveRuntimeState: !!adapter.activity, questions: !!adapter.question, approvals: false, tts: false } }); return;
+          capabilities: { textReply: true, liveRuntimeState: !!adapter.activity, questions: !!adapter.question, approvals: false, tts: false } });
+        const setupError = adapter.setupError?.();
+        if (setupError) error(setupError);
+        return;
       }
       if (msg.type === 'select') {
         if (recording) throw Error('recording_locked');
         if (!(await adapter.sessions()).some(s => s.id === msg.sessionId)) throw Error('session_unavailable');
         try { await adapter.activateSession?.(msg.sessionId); }
-        catch { send({ type: 'error', code: 'session_unavailable', sessionId: msg.sessionId }); return; }
+        catch (failure: any) {
+          const code = failure.message === WORKSPACE_ERROR ? WORKSPACE_ERROR : 'session_unavailable';
+          if (code === WORKSPACE_ERROR) console.error('Configure the bridge session working directory: its saved cwd must be an existing writable folder. Restart after editing the local bridge config.');
+          send({ type: 'error', code, sessionId: msg.sessionId }); return;
+        }
         selected = msg.sessionId; lastReply = ''; lastQuestion = ''; questionTarget = undefined; lastActivity = '';
         send({ type: 'selected', sessionId: selected }); return;
       }
@@ -200,7 +211,12 @@ export async function startBridge(config: BridgeConfig, adapter: AgentAdapter, r
     ws.on('error', () => {});
     ws.on('close', () => { peers.delete(ws); discard(); operation?.abort(); clearTimeout(authTimeout); clearInterval(heartbeat); clearInterval(poll); if (authenticated) activeDevices.delete(deviceId); });
   }
-  await new Promise<void>((resolve, reject) => { server.once('error', reject); server.listen(config.listen.port, config.listen.host, resolve); });
+  try {
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(config.listen.port, config.listen.host, () => { server.off('error', reject); resolve(); });
+    });
+  } catch (error) { await new Promise<void>(resolve => wss.close(() => resolve())); throw error; }
   return {
     address: server.address(),
     acceptPeer,

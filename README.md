@@ -43,12 +43,12 @@ plaintext traffic and must stay on a trusted LAN.
 
 The OS integration is a separate adapter layer. **Windows is implemented today;
 macOS and Linux bridges are planned.** The current Agent adapter is Codex.
-**Latest published stable: v0.5.2** — live native voice forwarding and up to 10 minutes per recording.
+**Current release: [v0.5.4](https://github.com/Charlesmpc/MirTar/releases/tag/v0.5.4)** — background bridge management, dedicated Agent sessions, and card questions.
 The bridge forwards audio while you speak, then submits once after you press OK again and native transcription has finished. Update the bridge for streaming; update the firmware as well to remove its old 30-second limit.
 See the [v0.5.2 validation and upgrade notes](docs/validation/streaming-voice-0.5.2.md).
-Development for **v0.5.4** adds [card questions and voice answers](docs/agent-questions.md) in new bridge-owned Codex sessions,
-alongside [Delete server](docs/validation/delete-server-0.5.3.md). Real backend/native-ASR round-trip and completed-session continuity
-have passed; physical badge acceptance is still pending. This is not a published release yet.
+v0.5.4 adds experimental [card questions and voice answers](docs/agent-questions.md) in new bridge-owned Codex sessions,
+alongside [Delete server](docs/validation/delete-server-0.5.3.md). Backend/native-ASR tests pass; the owner confirmed a physical
+Bluetooth voice/reply round-trip in legacy mode. Card questions and deletion still need physical-device acceptance.
 The new home has **Server list / Add server / Add config-file**. Bluetooth enrollment exchanges host identity and binding;
 file import uses an explicitly opened card hotspot. Each host owns its own optional Wi-Fi settings.
 The owner confirmed successful physical-device validation of v0.5.1 on 2026-10-25.
@@ -85,23 +85,45 @@ See [Bluetooth recovery](docs/server-onboarding.md#bluetooth-recovery-after-one-
 
 ## Get started
 
-Windows, BLE, Node.js **24.13.0+**, Edge, and a signed-in Codex desktop session are required.
-Configuration helpers support Windows PowerShell 5.1 and PowerShell 7. Firmware builds use PowerShell 7,
+Windows, BLE, Node.js **24.13.0+**, Edge, and an installed, signed-in Codex desktop app are required.
+Configuration helpers support Windows PowerShell 5.1 and PowerShell 7. Firmware builds use
 **ESP-IDF 5.5.6 / LVGL 9.5.0**, and Python.
 
 ```powershell
 npm.cmd ci --ignore-scripts
 # Only if private configuration does not already exist:
-.\tools\New-LocalConfig.ps1 -BluetoothOnly
+.\tools\New-LocalConfig.ps1 -BluetoothOnly -BridgeOwned
 # On the card choose Add server, then run this on the computer:
 .\tools\Add-Server.ps1
 # Complete the PIN prompt, press OK on the card, then start/restart the regular bridge:
-.\tools\Start-Bridge.ps1
+.\tools\Manage-BridgeService.ps1 -Action Install
 ```
 
 The host display name defaults to the computer name and can be changed during Add-Server or with `-Name`.
 Stable server IDs keep renaming separate from identity. The card does not scan/list nearby computers;
 Windows internally discovers the card in its explicit Bluetooth enrollment window.
+
+The first-time setup above needs no existing desktop session ID. To initialize configuration separately:
+
+```powershell
+.\tools\New-LocalConfig.ps1 -BluetoothOnly -BridgeOwned
+```
+
+On its first start, a bridge with no sessions creates `MirTar/workspaces/default` under the current user's home,
+initializes a dedicated **MirTar Agent** session, and saves its directory and ID locally. Restarts reuse them.
+To use an existing writable project, add `-WorkingDirectory 'D:\Projects\MyProject'` to setup instead.
+Existing configurations are preserved; add a separate session with `New-AgentSession.ps1`, optionally passing the same
+directory argument, then restart. Paths stay in local `.private/bridge.config.json`, outside the card and public firmware.
+See [workspace configuration and recovery](docs/agent-questions.md#workspace-and-first-start).
+
+0.5.4 can also [install a background bridge](docs/bridge-service.md) that starts when you log into Windows:
+
+```powershell
+.\tools\Manage-BridgeService.ps1 -Action Install
+```
+
+Stop an existing foreground bridge first. Manage it with `-Action Status / Start / Stop / Restart / Logs`;
+configuration and pairings are preserved. Run one background or foreground instance at a time.
 
 Alternatively, use **Add config-file** with a prepared file. Import adds/updates stable host IDs and preserves others.
 For legacy v1 settings, run `Convert-DeviceConfig.ps1` and upload the new `.private/device.v2.config.json`.
@@ -112,11 +134,11 @@ v0.3.1 compiled settings and v0.4.0 stored settings are not automatically migrat
 - [Build and flash](docs/device-quickstart.md) / [中文](docs/device-quickstart.zh_CN.md)
 - [Validation status](docs/validation/server-onboarding-0.5.1.md)
 
-v0.5.1 was submitted for community review on 2026-10-25 (project 1619, revision 3705).
-The verified receipt is **pending review**, not confirmation of public availability.
+Community project 1619 previously approved revision 3705 (v0.5.1). The 0.5.4 update materials are ready;
+see [community publishing status](docs/community-publishing.zh_CN.md) for the verified submission/review state.
 Build the credential-free image locally; preserve earlier verified images for rollback.
 
-The latest published public firmware is **0.5.2**; current source builds **0.5.4 development**. A default build never reads personal config and starts with no saved hosts on fresh NVS.
+The current public firmware and bridge are **0.5.4**. A default build never reads personal config and starts with no saved hosts on fresh NVS.
 Use `Build-PersonalFirmware.ps1` for a separately labeled local image containing an NVS preset. Its app has the source version;
 its package and card label include the selected personal suffix. Personal images must never enter a Release or community upload.
 One public codebase is maintained; the old private history archive does not need ongoing development.

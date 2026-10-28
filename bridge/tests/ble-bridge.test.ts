@@ -69,3 +69,31 @@ test('fragmented BLE uses shared authentication, audio and native-session reply 
     await other.wait('error'); assert.equal(other.readyState, 3);
   } finally { peer.close(); await bridge.close(); await rm(root, { recursive: true, force: true }); }
 });
+
+test('workspace setup failures reach an authenticated card and cannot start audio', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'mirtar-workspace-protocol-')), secret = 'a'.repeat(64);
+  let initial = true, starts = 0;
+  const adapter: AgentAdapter = {
+    id: 'workspace-test', sessions: async () => initial ? [] : [{ id: 'project', name: 'Project' }],
+    setupError: () => initial ? 'session_workspace_unavailable' : undefined,
+    activateSession: async () => { throw Error('session_workspace_unavailable'); },
+    history: async () => [], beginAudio() { starts++; throw Error('must not record'); }, close: async () => {},
+  };
+  const config: BridgeConfig = { version: 1, listen: { host: '127.0.0.1', port: 0, allowLanPlaintext: true },
+    devices: [{ id: 'badge', secret }], codex: { bin: '', edgePath: '', sessions: [] } };
+  const bridge = await startBridge(config, adapter, root), peers: FakeGattPeer[] = [];
+  async function connect() {
+    const peer = new FakeGattPeer(); peers.push(peer); bridge.acceptPeer(peer);
+    peer.control({ type: 'hello', version: 1, deviceId: 'badge', bootId: 'b'.repeat(32) });
+    const { challenge } = await peer.wait('challenge'); peer.control({ type: 'auth', proof: authProof(secret, challenge) });
+    return peer;
+  }
+  try {
+    let peer = await connect(); assert.deepEqual((await peer.wait('bound')).sessions, []);
+    assert.equal((await peer.wait('error')).code, 'session_workspace_unavailable'); peer.close();
+    initial = false; peer = await connect(); await peer.wait('bound');
+    peer.control({ type: 'select', sessionId: 'project' });
+    const error = await peer.wait('error'); assert.equal(error.code, 'session_workspace_unavailable'); assert.equal(error.sessionId, 'project');
+    peer.control({ type: 'begin', id: 1 }); await peer.wait('error'); assert.equal(starts, 0);
+  } finally { for (const peer of peers) peer.close(); await bridge.close(); await rm(root, { recursive: true, force: true }); }
+});

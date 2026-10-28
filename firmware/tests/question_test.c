@@ -24,6 +24,7 @@ void mt_test_questions(void){
     assert(mt_can_answer(&s)&&!mt_can_record(&s));s.page=MT_ANSWER_MENU;assert(mt_can_answer(&s));
     s.answer_submitting=true;assert(!mt_can_answer(&s));s.answer_submitting=false;s.recording=true;assert(!mt_can_answer(&s));
     s.recording=false;s.page=MT_READING;assert(!mt_can_answer(&s)&&!mt_can_record(&s));s.submitting=false;assert(!mt_can_record(&s));
-    s.question_pending=false;assert(mt_can_record(&s));s.question_pending=s.answer_submitting=true;mt_disconnect(&s);assert(!s.question_pending&&!s.answer_submitting&&!mt_can_record(&s));
+    s.question_pending=false;assert(mt_can_record(&s));s.page=MT_SESSION_SETUP;assert(!mt_can_record(&s)&&!mt_can_answer(&s));
+    s.question_pending=s.answer_submitting=true;mt_disconnect(&s);assert(!s.question_pending&&!s.answer_submitting&&!mt_can_record(&s));
     puts("Question parser, session/request isolation, size limits, immutable failed updates and answer/record guards: PASS");
 }

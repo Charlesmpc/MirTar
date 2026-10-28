@@ -40,28 +40,63 @@ Host checks cover original voice/transport behavior plus request-ID collisions, 
 ordering, options, secrets, skip, cancel, stale completions, ownership failure, delivery failure, cross-session isolation,
 card disconnect/reconnect, duplicate choice receipts and late audio results. Firmware host checks run the actual question
 parser and recording/answer guards, including oversized/invalid messages and immutable rejected updates.
-TypeScript check, **39 bridge tests**, four portal tests, the actual C configuration/question/bond/deletion checks,
+TypeScript check, **51 bridge tests**, four portal tests, the actual C configuration/question/bond/deletion checks,
 and six public/personal firmware-bundle guard tests all pass.
 
 ESP32-C3 public firmware compiled with actual question parser/answer symbols linked; merged NVS is empty.
 No private preset is an input. The unchanged partition layout supports an NVS-preserving app/segmented upgrade.
-Final checked development image (no personal preset):
+Final checked public image (no personal preset):
 
 ```text
 Version:                  0.5.4
-MirTar-full.bin (0x0):     7671e6a50704e58f24a08b2d9b29628d4a3d63d80f8cf9c4b1f2785755ddff89
-MirTar.bin (0x10000):     83ee043bad5b6ec34be466d9a00a729afbc29390d41ecb046c3c2d2a57de91b9
-Merged bytes:             2819872
+MirTar-full.bin (0x0):     428cff631033614b44539eb2af84003e7f23f226523b47202b910e6c11a610f3
+MirTar.bin (0x10000):     ba2c8cd8a6701c2fabd1ac6e9e1cb322c9bd12d656912e36f003b88550238183
+Merged bytes:             2820352
 NVS:                      empty
 ```
 
 Use an app-only or segmented NVS-preserving upgrade to retain existing personal configuration and pairing records.
 No personal image is a public release asset. No hardware was flashed during these checks.
 
+## First-start workspace follow-up (2026-10-27)
+
+The bridge now bootstraps an empty session list on startup. It creates a writable default folder under the user's home,
+or uses an explicitly configured existing project, then persists the native session ID and per-session `cwd`.
+The card only receives a configuration error code; absolute local paths stay on the computer.
+
+- Eight added setup/adapter tests cover default creation, saved-session reuse across restarts, explicit and host-default
+  paths, preservation of legacy sessions/bindings, missing/unusable directories, recorded bootstrap recovery, concurrent
+  edits, unknown creation outcomes, concurrent setup exclusion, and a directory removed after activation.
+- A ninth added bridge test sends setup/selection failures through the authenticated fragmented BLE protocol and verifies
+  that an unselected unavailable session cannot start audio. Actual C checks verify the setup-error page blocks recording.
+- Windows PowerShell 5.1 ran default and custom `New-LocalConfig -BridgeOwned` setups in isolated ignored folders;
+  both saved empty session lists for first-start initialization. Optional `New-AgentSession` arguments and helper syntax passed.
+- The installed real Codex backend initialized a separate test session using only the fixed `MIRTAR_READY` prompt.
+  Its workspace and native ID were persisted, a second setup pass reused them without another creation request,
+  and a fresh adapter resumed the same thread. The actual user's bridge config hash remained unchanged.
+- The updated public firmware compiled successfully. Its manifest reports no embedded/personal configuration, empty NVS,
+  and zero known credential/personal matches. Physical card display/button acceptance is still pending.
+
+These checks do not establish recovery of an unfinished Agent task or question after a bridge crash.
+Setup receipts prevent automatic duplicate creation when initialization has an unknown outcome.
+
+## Background service and owner confirmation (2026-10-28)
+
+Three additional bridge checks cover a real child process lifecycle (duplicate start, stale stop requests, graceful stop
+and restart), worker failure status, and clean rejection of an occupied port without an unhandled WebSocket error.
+The same management scripts were installed in two Windows user sessions. Login triggers, one-instance policy, listener
+ownership, automatic executable relocation and exact preservation of private configuration were checked. A live stop/restart
+cycle passed on the local installation; remote idempotent startup passed. No user logout/reboot was performed to test the trigger.
+
+The owner confirmed Add server and a physical Bluetooth voice/reply round-trip with the 0.5.4 application. A legacy desktop
+request was accepted but remained queued until its desktop conversation was activated; the same original request then completed
+and the owner confirmed the reply appeared on the card. No message was replayed. This does not validate physical card questions
+or deletion. A desktop writer conflict was also reproduced: merely switching desktop chats did not release ownership.
+
 ## Remaining coverage
 
-- No actual badge has been flashed for this feature. Physical buttons, small-screen readability and question audio over the
-  real BLE radio or Wi-Fi need owner acceptance. Host protocol/framing tests do not substitute for this.
+- The public merged image has not been flashed by the agent. Owner confirmation covers the basic Bluetooth voice/reply flow,
+  not every question/menu/deletion path. Those physical buttons, readability and question audio still need acceptance.
 - Desktop API access and new-process continuation do not establish simultaneous desktop/card control or graphical takeover.
 - Bridge-process restart/crash recovery of unfinished questions is not promised. Card-only reconnect is tested separately.
 - Native desktop popups in legacy forwarding sessions are not redirected. Users must select a new bridge-owned session.

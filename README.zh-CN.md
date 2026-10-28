@@ -37,11 +37,15 @@ MirTar 把 FoloToy AI Passport 卡片变成**电脑上编程 Agent 的随身控�
 这不等于离线运行 Agent。BLE 使用认证加密和应用绑定；Wi-Fi 当前仍为明文，只适合可信局域网。
 
 **OS 适配层独立于 Agent 和设备协议**：目前实现 Windows 桥接，后续计划实现 macOS、Linux。
-当前 Agent 适配器是 Codex。**已发布稳定版为 v0.5.2**：边录边送往 Codex 原生语音，单次录音上限提升到 10 分钟。
+当前 Agent 适配器是 Codex。**当前版本为 [v0.5.4](https://github.com/Charlesmpc/MirTar/releases/tag/v0.5.4)**：增加后台桥接、专用 Agent 会话和实验性卡片问答，同时保留边录边传与单次 10 分钟录音。
 再次按 OK 后，等最后一段转写确认完成，再一次性提交到原桌面会话。实时转发需要更新桥接；解除旧的 30 秒上限还需要更新固件。
 见 [v0.5.2 验证与升级说明](docs/validation/streaming-voice-0.5.2.md)。
-**v0.5.4 开发中**：新增[卡片提问与语音答复](docs/agent-questions.zh_CN.md)，用于新建的桥接驱动会话；包含
-[Delete server](docs/validation/delete-server-0.5.3.md)。真实 Codex、原生 ASR 闭环与完成后会话接续已验证，卡片实机待验收；尚未正式发布。
+v0.5.4 新增[卡片提问与语音答复](docs/agent-questions.zh_CN.md)，用于新建的桥接驱动会话；包含
+[Delete server](docs/validation/delete-server-0.5.3.md)。真实 Codex、原生 ASR 与完成后会话接续已验证；作者已确认旧桌面转发模式下的实机蓝牙语音／回复闭环，卡片问答与删除操作仍待实机验收。
+
+0.5.4 桥接还支持[首次启动自动创建工作区与自定义目录](docs/agent-questions.zh_CN.md#工作目录与首次启动)：
+没有会话时，在用户目录创建 `MirTar/workspaces/default`，初始化专用会话并保存；重启继续使用该会话和目录。
+已有配置保持原样，目录失败会提示在电脑端修复。
 开机三个入口：Server list、Add server、Add config-file。蓝牙添加交换主机名称和绑定信息；
 文件导入只在主动开启卡片热点后进行。每台主机保存自己的可选 Wi-Fi，默认连接方式仍是蓝牙。
 作者已于 2026-10-25 确认 v0.5.1 实机验证通过；证据来源和剩余覆盖范围见[验证记录](docs/validation/server-onboarding-0.5.1.md)。
@@ -65,17 +69,17 @@ MirTar 把 FoloToy AI Passport 卡片变成**电脑上编程 Agent 的随身控�
 
 ## 开始使用
 
-需要 AI Passport、BLE Windows、Node.js **24.13.0+**、Edge、已登录的 Codex 桌面会话。
-配置工具支持 Windows PowerShell 5.1／PowerShell 7；编译使用 PowerShell 7、**ESP-IDF 5.5.6 / LVGL 9.5.0**。
+需要 AI Passport、BLE Windows、Node.js **24.13.0+**、Edge，以及已安装并登录的 Codex 桌面应用。
+配置工具支持 Windows PowerShell 5.1／PowerShell 7；编译使用**ESP-IDF 5.5.6 / LVGL 9.5.0**。
 
 ```powershell
 npm.cmd ci --ignore-scripts
 # 只在尚无私有配置时运行，原有文件不覆盖：
-.\tools\New-LocalConfig.ps1 -BluetoothOnly
+.\tools\New-LocalConfig.ps1 -BluetoothOnly -BridgeOwned
 # 卡片选 Add server，再在目标电脑运行：
 .\tools\Add-Server.ps1
 # 完成 Windows 配对码输入、卡片 OK 确认，再启动／重启普通桥接：
-.\tools\Start-Bridge.ps1
+.\tools\Manage-BridgeService.ps1 -Action Install
 ```
 
 主机显示名称默认电脑名，可在添加时编辑或用 `-Name` 指定；固定主机 ID 与显示名分离。
@@ -84,14 +88,36 @@ npm.cmd ci --ignore-scripts
 旧 v1 配置先运行 `Convert-DeviceConfig.ps1`，得到独立的 `.private/device.v2.config.json`，原文件不动；
 蓝牙添加后的实际绑定信息可用 `Export-DeviceConfig.ps1` 导出。旧编译配置和 v0.4.0 存储不会自动迁移。
 
+以上首次配置流程不要求已有桌面会话 ID；首次启动桥接自动初始化 `MirTar Agent`。
+若需要单独生成初始配置，运行：
+
+```powershell
+.\tools\New-LocalConfig.ps1 -BluetoothOnly -BridgeOwned
+```
+
+需要使用已有项目时，添加 `-WorkingDirectory 'D:\Projects\MyProject'`（目录需存在且可写）。
+路径保存在本机 `.private/bridge.config.json`，不传到卡片、不写入公版固件。
+已有配置需要另建专用会话时，运行 `New-AgentSession.ps1`，可同样指定 `-WorkingDirectory`，然后重启桥接。
+修复路径、配置字段与失败处理见[工作目录说明](docs/agent-questions.zh_CN.md#工作目录与首次启动)。
+
+0.5.4 还可以[安装后台桥接](docs/bridge-service.zh_CN.md)，登录 Windows 后自动运行，无需每次打开 PowerShell：
+
+```powershell
+.\tools\Manage-BridgeService.ps1 -Action Install
+```
+
+已有前台桥接时先 Ctrl+C 停止；日常用 `-Action Status / Start / Stop / Restart / Logs` 管理。
+配置和配对保留，后台与前台只运行一份。
+
 - [主机添加、文件格式与完整步骤](docs/server-onboarding.zh_CN.md)
 - [固件编译与刷入](docs/device-quickstart.zh_CN.md)
 - [验证记录](docs/validation/server-onboarding-0.5.1.md)
 
-v0.5.1 已于 2026-10-25 提交社区审核（项目 1619，版本记录 3705），回执为**待审核**，不代表已经公开。
+社区项目 1619 的旧公开版本为 v0.5.1（版本记录 3705，已通过审核）。0.5.4 更新资料已准备，
+提交与审核状态以[社区发布记录](docs/community-publishing.zh_CN.md)中的服务端回执为准。
 可本地构建不含私人凭据的通用镜像，保留原已验证镜像作回退。
 
-最新已发布公版为 `0.5.2`，当前源码构建 `0.5.4` 开发版。不修改配置也能编译，全新设备主机列表为空。
+当前公版固件和桥接为 `0.5.4`。不修改配置也能编译，全新设备主机列表为空。
 个人配置可用 `Build-PersonalFirmware.ps1` 打包进本地 NVS 镜像，并用自己的标签区分；
 个人镜像禁止上传 Release 或社区。只维护公开源码，旧私有历史归档不再用于开发。
 见[公开版与个人镜像的构建说明](docs/build-variants.zh_CN.md)。

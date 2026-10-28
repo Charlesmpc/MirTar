@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { tmpdir } from 'node:os';
 import { EventEmitter } from 'node:events';
 import { CodexAdapter } from '../src/codex/adapter.ts';
 
@@ -23,7 +24,7 @@ function fixture() {
     if (method === 'thread/turns/list') return { data: final ? [{ id: 'turn-a', status: 'completed', items: [{ type: 'agentMessage', text: 'DONE' }] }] : [] };
     throw Error('unexpected RPC');
   };
-  const adapter = new CodexAdapter({ bin: '', edgePath: '', sessions: [{ id: 'session-a', name: 'Card', execution: 'bridge', cwd: '/workspace' }] },
+  const adapter = new CodexAdapter({ bin: '', edgePath: '', sessions: [{ id: 'session-a', name: 'Card', execution: 'bridge', cwd: tmpdir() }] },
     { async openWebRtc() { throw Error('unused'); } }, { rpc, transcribe: async (_bin, _media, input) => { for await (const _ of input) {} return 'ORBIT'; } });
   return { rpc, calls, responses, rejected, adapter, complete() { final = true; rpc.emit('notification', 'turn/completed', { threadId: 'session-a', turn: { id: 'turn-a', status: 'completed' } }); } };
 }

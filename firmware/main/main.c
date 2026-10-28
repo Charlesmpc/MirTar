@@ -449,7 +449,7 @@ static void handle_json(const char *data) {
             snprintf(s->id, sizeof(s->id), "%s", str(item, "id")); snprintf(s->name, sizeof(s->name), "%s", str(item, "name"));
         }
         state.selected = 0;
-        if (!state.session_count) { status("没有可用会话"); render("请在电脑配置已有的 Codex 桌面会话"); }
+        if (!state.session_count) { status("没有可用会话"); render("请在电脑桥接配置 Agent 会话\n\n检查默认工作目录后重启桥接"); }
         else if (state.session_count == 1) choose_session(); else show_sessions();
     } else if (!strcmp(type, "selected")) { status("就绪  OK 录音"); render("按 OK 开始说话\n\n上下翻阅内容\n长按上下切换会话"); }
     else if(!strcmp(type,"question")) {
@@ -502,6 +502,14 @@ static void handle_json(const char *data) {
             cJSON_Delete(o); return;
         }
         atomic_store(&audio_submit, false); atomic_store(&audio_running, false); state.recording = false;
+        if (!strcmp(str(o,"code"),"session_workspace_unavailable") || !strcmp(str(o,"code"),"session_setup_failed")) {
+            state.page=MT_SESSION_SETUP;state.submitting=false;state.answer_submitting=false;
+            status("请配置电脑桥接会话");
+            render(!strcmp(str(o,"code"),"session_workspace_unavailable")
+                ? "请在电脑桥接配置\n会话默认目录\n\n目录需存在且可写\n修改后重启桥接\n长按 OK 返回"
+                : "Agent 会话初始化失败\n\n请检查电脑桥接提示\n修复后重启桥接\n长按 OK 返回");
+            cJSON_Delete(o);return;
+        }
         bool unknown = !strcmp(str(o, "code"), "submission_unknown") || !strcmp(str(o, "code"), "input_cancelled_or_pending");
         if(state.question_pending||cJSON_IsTrue(cJSON_GetObjectItem(o,"answering"))){
             state.answer_submitting=unknown;
@@ -562,7 +570,7 @@ static void handle_key(int key, int action) {
         return;
     }
     int direction = key == BSP_BTN_UP ? -1 : 1;
-    if (action == BSP_BTN_LONG && key != BSP_BTN_OK && (state.page == MT_READING||state.page==MT_QUESTION||state.page==MT_ANSWER_MENU) && state.session_count > 1) {
+    if (action == BSP_BTN_LONG && key != BSP_BTN_OK && (state.page == MT_READING||state.page==MT_QUESTION||state.page==MT_ANSWER_MENU||state.page==MT_SESSION_SETUP) && state.session_count > 1) {
         state.selected = (state.selected + state.session_count + direction) % state.session_count; choose_session(); return;
     }
     if (action != BSP_BTN_CLICK) return;

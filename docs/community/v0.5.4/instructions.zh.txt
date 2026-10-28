@@ -1,0 +1,5 @@
+1. Windows 按桥接包 README 安装依赖、登录 Codex 并初始化专用会话。
+2. 卡片选 Add server，电脑运行 .\tools\Add-Server.ps1；Windows 输入六位码，卡片 OK 确认。
+3. 运行 .\tools\Manage-BridgeService.ps1 -Action Install；卡片选 Server list→主机→Bluetooth→MirTar Agent，显示就绪。
+4. OK 录音，再 OK 发送；追问时 OK 选择语音或选项回答。上下翻阅，长按上下切会话，长按 OK 回首页。
+5. 下次连接。蓝牙无需配网，电脑需联网。
